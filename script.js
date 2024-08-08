@@ -243,7 +243,7 @@ window.onload = function () {
         this.showNewGameButton();
       } else if (this.score.player2 >= 12) {
         // Record the win in move history instead of alerting
-        updateMoveHistory("Player 2 wins!");
+        updateMoveHistory("AI wins!");
         this.showNewGameButton();
       } else if (this.isDraw()) {
         // Record the draw in move history
@@ -408,7 +408,7 @@ window.onload = function () {
       let boardCopy = JSON.parse(JSON.stringify(Board.board));
       boardCopy[move.piece.position[0]][move.piece.position[1]] = 0;
       boardCopy[move.tile.position[0]][move.tile.position[1]] = 2;
-      let moveValue = minimax(boardCopy, 5, false, -Infinity, Infinity); // Increased depth to 5
+      let moveValue = minimax(boardCopy, 5, false, -Infinity, Infinity); // Adjusted depth to 5 for performance
       if (moveValue > bestValue) {
         bestValue = moveValue;
         bestMove = move;
@@ -431,6 +431,71 @@ window.onload = function () {
         Board.changePlayerTurn();
       }
     }
+  }
+
+  // Enhanced evaluation function
+  function evaluateBoard(board) {
+    let score = 0;
+    for (let row = 0; row < board.length; row++) {
+      for (let col = 0; col < board[row].length; col++) {
+        if (board[row][col] === 1) {
+          score -= 1;
+          if (isPieceSafe(board, row, col, 1)) {
+            score -= 0.5; // Penalize if the piece is not safe
+          }
+          if (isPieceKing(board, row, col, 1)) {
+            score -= 2; // Penalize more if the piece is a king
+          }
+        } else if (board[row][col] === 2) {
+          score += 1;
+          if (isPieceSafe(board, row, col, 2)) {
+            score += 0.5; // Reward if the piece is safe
+          }
+          if (isPieceKing(board, row, col, 2)) {
+            score += 2; // Reward more if the piece is a king
+          }
+        }
+      }
+    }
+    // Additional factors for evaluation
+    score += controlCenter(board, 2) - controlCenter(board, 1); // Control of the center
+    score += potentialMoves(board, 2) - potentialMoves(board, 1); // Potential future moves
+    return score;
+  }
+
+  // Check if a piece is a king
+  function isPieceKing(board, row, col, player) {
+    return (player === 1 && row === 0) || (player === 2 && row === 7);
+  }
+
+  // Check control of the center
+  function controlCenter(board, player) {
+    let centerControl = 0;
+    const centerPositions = [
+      [3, 3], [3, 4], [4, 3], [4, 4]
+    ];
+    for (let [row, col] of centerPositions) {
+      if (board[row][col] === player) {
+        centerControl += 1;
+      }
+    }
+    return centerControl;
+  }
+
+  // Check potential future moves
+  function potentialMoves(board, player) {
+    let moves = 0;
+    for (let piece of pieces) {
+      if (piece.player === player) {
+        for (let tile of tiles) {
+          let inRange = tile.inRange(piece);
+          if (inRange === 'regular' || (inRange === 'jump' && piece.canOpponentJump(tile.position))) {
+            moves += 1;
+          }
+        }
+      }
+    }
+    return moves;
   }
   
   // Initialize the board
