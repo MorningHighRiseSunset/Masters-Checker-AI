@@ -126,6 +126,16 @@ window.onload = function () {
       return false;
     };
 
+    this.continueJump = function () {
+      if (this.canJumpAny()) {
+        Board.continuousjump = true;
+        this.element.addClass('selected');
+      } else {
+        Board.continuousjump = false;
+        Board.changePlayerTurn();
+      }
+    };
+
     this.remove = function () {
       this.element.css("display", "none");
       if (this.player == 1) {
@@ -317,52 +327,94 @@ window.onload = function () {
   // Evaluate the board state
   function evaluateBoard(board) {
     let score = 0;
-    for (let row of board) {
-      for (let cell of row) {
-        if (cell === 1) {
+    for (let row = 0; row < board.length; row++) {
+      for (let col = 0; col < board[row].length; col++) {
+        if (board[row][col] === 1) {
           score -= 1;
-        } else if (cell === 2) {
+          if (isPieceSafe(board, row, col, 1)) {
+            score -= 0.5; // Penalize if the piece is not safe
+          }
+        } else if (board[row][col] === 2) {
           score += 1;
+          if (isPieceSafe(board, row, col, 2)) {
+            score += 0.5; // Reward if the piece is safe
+          }
         }
       }
     }
     return score;
   }
 
-  // Get all possible moves for a player
-  function getAllPossibleMoves(board, player) {
-  let moves = [];
-  for (let piece of pieces) {
-    if (piece.player === player) {
-      for (let tile of tiles) {
-        let inRange = tile.inRange(piece);
-        if (inRange === 'regular' || (inRange === 'jump' && piece.canOpponentJump(tile.position))) {
-          let newBoard = JSON.parse(JSON.stringify(board));
-          newBoard[piece.position[0]][piece.position[1]] = 0;
-          newBoard[tile.position[0]][tile.position[1]] = player;
-          moves.push({ board: newBoard, piece, tile, inRange });
+  // Check if a piece is safe
+  function isPieceSafe(board, row, col, player) {
+    const opponent = player === 1 ? 2 : 1;
+    const directions = [
+      [-1, -1], [-1, 1], [1, -1], [1, 1]
+    ];
+    for (let [dx, dy] of directions) {
+      const newRow = row + dx;
+      const newCol = col + dy;
+      const jumpRow = row + 2 * dx;
+      const jumpCol = col + 2 * dy;
+      if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8 &&
+          jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8) {
+        if (board[newRow][newCol] === opponent && board[jumpRow][jumpCol] === 0) {
+          return false; // The piece is not safe
         }
       }
     }
+    return true; // The piece is safe
   }
-  return moves;
-}
+
+  // Get all possible moves for a player
+  function getAllPossibleMoves(board, player) {
+    let moves = [];
+    for (let piece of pieces) {
+      if (piece.player === player) {
+        for (let tile of tiles) {
+          let inRange = tile.inRange(piece);
+          if (inRange === 'regular' || (inRange === 'jump' && piece.canOpponentJump(tile.position))) {
+            let newBoard = JSON.parse(JSON.stringify(board));
+            newBoard[piece.position[0]][piece.position[1]] = 0;
+            newBoard[tile.position[0]][tile.position[1]] = player;
+            moves.push({ board: newBoard, piece, tile, inRange });
+          }
+        }
+      }
+    }
+    return moves;
+  }
 
   // Function for AI move
   function aiMove() {
     let bestMove = null;
     let bestValue = -Infinity;
+    let jumpMoves = [];
+    let regularMoves = [];
+
+    // Separate jump moves and regular moves
     for (let move of getAllPossibleMoves(Board.board, 2)) {
+      if (move.inRange === 'jump') {
+        jumpMoves.push(move);
+      } else {
+        regularMoves.push(move);
+      }
+    }
+
+    // Prioritize jump moves
+    let movesToConsider = jumpMoves.length > 0 ? jumpMoves : regularMoves;
+
+    for (let move of movesToConsider) {
       let boardCopy = JSON.parse(JSON.stringify(Board.board));
       boardCopy[move.piece.position[0]][move.piece.position[1]] = 0;
       boardCopy[move.tile.position[0]][move.tile.position[1]] = 2;
-      let moveValue = minimax(boardCopy, 3, false, -Infinity, Infinity);
+      let moveValue = minimax(boardCopy, 5, false, -Infinity, Infinity); // Increased depth to 5
       if (moveValue > bestValue) {
         bestValue = moveValue;
         bestMove = move;
       }
     }
-
+  
     if (bestMove) {
       let fromPosition = bestMove.piece.position;
       let toPosition = bestMove.tile.position;
@@ -371,17 +423,23 @@ window.onload = function () {
       }
       bestMove.piece.move(bestMove.tile);
       updateMoveHistory(`E${fromPosition[0]}${fromPosition[1]} ${bestMove.inRange === 'jump' ? 'X' : '-'} E${toPosition[0]}${toPosition[1]}`, true);
-      Board.changePlayerTurn();
+  
+      // Check for additional jumps
+      if (bestMove.inRange === 'jump' && bestMove.piece.canJumpAny()) {
+        setTimeout(aiMove, 1000); // Continue AI move after a delay
+      } else {
+        Board.changePlayerTurn();
+      }
     }
   }
-
+  
   // Initialize the board
   Board.initalize();
-
+  
   /***
   Events
   ***/
-
+  
   // Select the piece on click if it is the player's turn
   $('.piece').on("click", function () {
     var selected;
@@ -399,71 +457,65 @@ window.onload = function () {
       }
     }
   });
-
+  
   // Reset game when clear button is pressed
   $('#cleargame').on("click", function () {
     Board.clear();
   });
-
+  
   // Move piece when tile is clicked
   $('.tile').on("click", function () {
     if ($('.selected').length != 0) {
-        var tileID = $(this).attr("id").replace(/tile/, '');
-        var tile = tiles[tileID];
-        var piece = pieces[$('.selected').attr("id")];
-        var inRange = tile.inRange(piece);
-        if (inRange != 'wrong') {
-          if (inRange == 'jump') {
-              if (piece.opponentJump(tile)) {
-                  var lastTile = $('.selected').attr("id"); // Get the last tile the piece was on
-                  piece.move(tile);
-                  var opponentTile = tile.position; // Get the position of the opponent's tile
-                  updateMoveHistory("E" + lastTile + " X E" + tileID); // Update move history with consistent format
-                  if (piece.canJumpAny()) {
-                      piece.element.addClass('selected');
-                      Board.continuousjump = true;
-                  } else {
-                      Board.changePlayerTurn();
-                  }
-              }
-          } else if (inRange == 'regular' && !Board.jumpexist) {
-              if (!piece.canJumpAny()) {
-                  var lastTile = $('.selected').attr("id"); // Get the last tile the piece was on
-                  piece.move(tile);
-                  updateMoveHistory("E" + lastTile + " - E" + tileID); // Update move history with consistent format
-                  Board.changePlayerTurn();
-              } else {
-                  alert("You must jump when possible!");
-              }
+      var tileID = $(this).attr("id").replace(/tile/, '');
+      var tile = tiles[tileID];
+      var piece = pieces[$('.selected').attr("id")];
+      var inRange = tile.inRange(piece);
+      if (inRange != 'wrong') {
+        if (inRange == 'jump') {
+          if (piece.opponentJump(tile)) {
+            var lastTile = $('.selected').attr("id"); // Get the last tile the piece was on
+            piece.move(tile);
+            var opponentTile = tile.position; // Get the position of the opponent's tile
+            updateMoveHistory("E" + lastTile + " X E" + tileID); // Update move history with consistent format
+            piece.continueJump(); // Check for additional jumps
           }
+        } else if (inRange == 'regular' && !Board.jumpexist) {
+          if (!piece.canJumpAny()) {
+            var lastTile = $('.selected').attr("id"); // Get the last tile the piece was on
+            piece.move(tile);
+            updateMoveHistory("E" + lastTile + " - E" + tileID); // Update move history with consistent format
+            Board.changePlayerTurn();
+          } else {
+            alert("You must jump when possible!");
+          }
+        }
       }
-  }
-});
-
-// New buttons for copying and printing moves
-$('#copyMovesBtn').on('click', function() {
-  var movesText = moveList.map(move => move.san).join(', '); // Collect moves in SAN format
-  navigator.clipboard.writeText(movesText).then(function() {
-    swal("Success", "Moves copied to clipboard!", "success");
-  }, function(err) {
-    swal("Error", "Failed to copy moves: " + err, "error");
+    }
   });
-});
-
-$('#printMovesBtn').on('click', function() {
-  var movesText = moveList.map(move => move.san).join(', '); // Collect moves in SAN format
-  var printWindow = window.open('', '', 'height=400,width=600');
-  printWindow.document.write('<html><head><title>Checkers Moves</title></head><body>');
-  printWindow.document.write('<h1>Recorded Checkers Moves</h1>');
-  printWindow.document.write('<pre>' + movesText + '</pre>');
-  printWindow.document.write('</body></html>');
-  printWindow.document.close();
-  printWindow.print();
-});
-
-// New Game button functionality
-$('#newGameBtn').on('click', function() {
-  location.reload(); // Reload the page to start a new game
-});
-}
-           
+  
+  // New buttons for copying and printing moves
+  $('#copyMovesBtn').on('click', function() {
+    var movesText = moveList.map(move => move.san).join(', '); // Collect moves in SAN format
+    navigator.clipboard.writeText(movesText).then(function() {
+      swal("Success", "Moves copied to clipboard!", "success");
+    }, function(err) {
+      swal("Error", "Failed to copy moves: " + err, "error");
+    });
+  });
+  
+  $('#printMovesBtn').on('click', function() {
+    var movesText = moveList.map(move => move.san).join(', '); // Collect moves in SAN format
+    var printWindow = window.open('', '', 'height=400,width=600');
+    printWindow.document.write('<html><head><title>Checkers Moves</title></head><body>');
+    printWindow.document.write('<h1>Recorded Checkers Moves</h1>');
+    printWindow.document.write('<pre>' + movesText + '</pre>');
+    printWindow.document.write('</body></html>');
+    printWindow.document.close();
+    printWindow.print();
+  });
+  
+  // New Game button functionality
+  $('#newGameBtn').on('click', function() {
+    location.reload(); // Reload the page to start a new game
+  });
+  }
