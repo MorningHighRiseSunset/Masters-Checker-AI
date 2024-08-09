@@ -391,7 +391,7 @@ window.onload = function () {
     let bestValue = -Infinity;
     let jumpMoves = [];
     let regularMoves = [];
-
+  
     // Separate jump moves and regular moves
     for (let move of getAllPossibleMoves(Board.board, 2)) {
       if (move.inRange === 'jump') {
@@ -400,17 +400,17 @@ window.onload = function () {
         regularMoves.push(move);
       }
     }
-
+  
     // Prioritize jump moves
     let movesToConsider = jumpMoves.length > 0 ? jumpMoves : regularMoves;
-
+  
     for (let move of movesToConsider) {
       let boardCopy = JSON.parse(JSON.stringify(Board.board));
       boardCopy[move.piece.position[0]][move.piece.position[1]] = 0;
       boardCopy[move.tile.position[0]][move.tile.position[1]] = 2;
       let moveValue = minimax(boardCopy, 5, false, -Infinity, Infinity); // Adjusted depth to 5 for performance
       if (moveValue > bestValue) {
-        bestValue = moveValue;
+        bestValue = moveValue = moveValue;
         bestMove = move;
       }
     }
@@ -432,7 +432,7 @@ window.onload = function () {
       }
     }
   }
-
+  
   // Enhanced evaluation function
   function evaluateBoard(board) {
     let score = 0;
@@ -462,12 +462,12 @@ window.onload = function () {
     score += potentialMoves(board, 2) - potentialMoves(board, 1); // Potential future moves
     return score;
   }
-
+  
   // Check if a piece is a king
   function isPieceKing(board, row, col, player) {
     return (player === 1 && row === 0) || (player === 2 && row === 7);
   }
-
+  
   // Check control of the center
   function controlCenter(board, player) {
     let centerControl = 0;
@@ -481,7 +481,7 @@ window.onload = function () {
     }
     return centerControl;
   }
-
+  
   // Check potential future moves
   function potentialMoves(board, player) {
     let moves = 0;
@@ -583,4 +583,4 @@ window.onload = function () {
   $('#newGameBtn').on('click', function() {
     location.reload(); // Reload the page to start a new game
   });
-  }
+}
