@@ -40,9 +40,9 @@ div.stats {
   color: #3A3042;
   border-radius: 3px;
   box-shadow: 1px 1px 3px #232621;
-  position: absolute; /* add this property */
-  right: 0; /* add this property */
-  top: 0; /* add this property */
+  position: absolute;
+  right: 0;
+  top: 0;
 }
 div.stats {
   margin: 50px auto !important; }
@@ -55,7 +55,9 @@ div.stats {
     box-sizing: border-box;
     padding: 0 15px 20px;
     border-top-left-radius: 3px;
-    color: #232621; }
+    color: #232621;
+    height: 150px; /* Set a fixed height */
+  }
     div.stats #player1 .capturedPiece {
       width: 2.4vmin;
       height: 2.4vmin;
@@ -78,7 +80,9 @@ div.stats {
     display: block; /* Changed from inline-block to block */
     padding: 0 15px 20px;
     border-top-right-radius: 3px;
-    color: #005d9b; }
+    color: #005d9b;
+    height: 150px; /* Set a fixed height */
+  }
     div.stats #player2 .capturedPiece {
       width: 2.4vmin;
       height: 2.4vmin;
@@ -94,7 +98,7 @@ div.stats {
   div.stats div.turn {
     height: 10px;
     width: 100%;
-    background: linear-gradient(to right, #BEEE62 50%, transparent 50%);
+    background: linear-gradient(to right, #eec262 50%, transparent 50%);
     border-radius: 0 0 3px 3px; }
   div.stats span#winner {
     display: block;
