@@ -23,11 +23,8 @@
       <div class="clearfix"></div>
       <div class="turn"></div>
       <span id="winner"></span> 
-  
         <center>
           <div>
-      <input type="button" button id="cleargame" class="blueButton" value="RESET">
-      <input type="button" class="blueButton" value="WAGER" onclick="displayPopup()">
       
       <script>
         function displayPopup() {
@@ -52,18 +49,22 @@
        </div>
       </center>
   </div>
-  <iframe 
-      src="https://brie.fi/ng/good-exit-72?audio=0&video=0&fs=1&invite=0&prefs=1&share=0&chat=1"
-      allow="camera; microphone; fullscreen; speaker; display-capture"
-      style="width: 100%; height: 40%; border: none; overflow: hidden;"
-    ></iframe>
+
+      <!-- Move History Section -->
+      <div id="moveHistory" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; background-color: #f9f9f9;">
+        <h4>Move History</h4>
+        <!-- Moves will be appended here -->
+      </div>
     
     <!-- New section for copying and printing moves -->
     <div style="margin-top: 20px;">
-      <h3>Checker Moves</h3>
-      <input type="button" class="blueButton" id="copyMovesBtn" value="COPY">
-      <input type="button" class="blueButton" id="printMovesBtn" value="PRINT">
+      <input type="button" class="blueButton" id="copyMovesBtn" value="COPY" style="margin-bottom: 20px;">
+      <input type="button" class="blueButton" id="printMovesBtn" value="PRINT" style="margin-bottom: 20px;">
     </div>
+
+    <input type="button" id="cleargame" class="blueButton" value="RESET" style="margin-bottom: 20px;">
+    <input type="button" class="blueButton" value="WAGER" onclick="displayPopup()" style="margin-bottom: 20px;">
+    <input type="button" class="blueButton" value="2-PLAY" onclick="window.location.href='https://masters-checkers-game.netlify.app/'" style="margin-bottom: 20px;"> <!-- New Multiplayer button -->
 
     <div id="board">
       <div class="tiles"></div>
@@ -71,12 +72,6 @@
         <div class="player1pieces"></div>
         <div class="player2pieces"></div>
       </div>
-    </div>
-    
-    <!-- Move History Section -->
-    <div id="moveHistory" style="margin-top: 20px; padding: 10px; border: 1px solid #ccc; background-color: #f9f9f9;">
-      <h4>Move History</h4>
-      <!-- Moves will be appended here -->
     </div>
 
     <!-- New Game Button -->
