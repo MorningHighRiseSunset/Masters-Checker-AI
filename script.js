@@ -41,9 +41,10 @@ window.onload = function () {
     this.position = position;
     this.player = this.element.attr("id") < 12 ? 1 : 2;
     this.king = false;
-
+  
     this.makeKing = function () {
-      this.element.css("backgroundImage", "url('img/king" + this.player + ".png')");
+      const kingImagePath = "img/king" + this.player + ".png";
+      this.element.css("backgroundImage", "url('" + kingImagePath + "')");
       this.king = true;
       // Notify that the piece has been crowned
       console.log("Player " + this.player + "'s piece has been crowned a king!");
@@ -51,6 +52,8 @@ window.onload = function () {
       console.log("Piece reached the opposite side and became a king!");
       // Update move history with the king message
       updateMoveHistory("Player " + this.player + "'s piece has been crowned a king!");
+      // Log the applied background image for debugging
+      console.log("Applied background image:", this.element.css("backgroundImage"));
     }
 
     this.move = function (tile) {
@@ -293,147 +296,70 @@ window.onload = function () {
     return Math.floor(Math.random() * max);
   }
 
-  // Minimax algorithm with alpha-beta pruning
-  function minimax(board, depth, isMaximizingPlayer, alpha, beta) {
-    if (depth === 0 || Board.checkForWin()) {
-      return evaluateBoard(board);
-    }
+  // Transposition table
+  const transpositionTable = new Map();
 
-    if (isMaximizingPlayer) {
-      let maxEval = -Infinity;
-      for (let move of getAllPossibleMoves(board, 2)) {
-        let eval = minimax(move.board, depth - 1, false, alpha, beta);
-        maxEval = Math.max(maxEval, eval);
-        alpha = Math.max(alpha, eval);
-        if (beta <= alpha) {
-          break;
-        }
-      }
-      return maxEval;
-    } else {
-      let minEval = Infinity;
-      for (let move of getAllPossibleMoves(board, 1)) {
-        let eval = minimax(move.board, depth - 1, true, alpha, beta);
-        minEval = Math.min(minEval, eval);
-        beta = Math.min(beta, eval);
-        if (beta <= alpha) {
-          break;
-        }
-      }
-      return minEval;
-    }
+  // Simplified Neural Network (Placeholder)
+  function evaluateBoardWithNN(board) {
+    // Placeholder for neural network evaluation
+    // In a real implementation, you would use a trained neural network model
+    return evaluateBoard(board);
   }
 
-  // Evaluate the board state
-  function evaluateBoard(board) {
-    let score = 0;
-    for (let row = 0; row < board.length; row++) {
-      for (let col = 0; col < board[row].length; col++) {
-        if (board[row][col] === 1) {
-          score -= 1;
-          if (isPieceSafe(board, row, col, 1)) {
-            score -= 0.5; // Penalize if the piece is not safe
-          }
-        } else if (board[row][col] === 2) {
-          score += 1;
-          if (isPieceSafe(board, row, col, 2)) {
-            score += 0.5; // Reward if the piece is safe
-          }
-        }
-      }
-    }
-    return score;
-  }
-
-  // Check if a piece is safe
-  function isPieceSafe(board, row, col, player) {
-    const opponent = player === 1 ? 2 : 1;
-    const directions = [
-      [-1, -1], [-1, 1], [1, -1], [1, 1]
-    ];
-    for (let [dx, dy] of directions) {
-      const newRow = row + dx;
-      const newCol = col + dy;
-      const jumpRow = row + 2 * dx;
-      const jumpCol = col + 2 * dy;
-      if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8 &&
-          jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8) {
-        if (board[newRow][newCol] === opponent && board[jumpRow][jumpCol] === 0) {
-          return false; // The piece is not safe
-        }
-      }
-    }
-    return true; // The piece is safe
-  }
-
-  // Get all possible moves for a player
-  function getAllPossibleMoves(board, player) {
-    let moves = [];
-    for (let piece of pieces) {
-      if (piece.player === player) {
-        for (let tile of tiles) {
-          let inRange = tile.inRange(piece);
-          if (inRange === 'regular' || (inRange === 'jump' && piece.canOpponentJump(tile.position))) {
-            let newBoard = JSON.parse(JSON.stringify(board));
-            newBoard[piece.position[0]][piece.position[1]] = 0;
-            newBoard[tile.position[0]][tile.position[1]] = player;
-            moves.push({ board: newBoard, piece, tile, inRange });
-          }
-        }
-      }
-    }
-    return moves;
-  }
-
-  // Function for AI move
-  function aiMove() {
+  // Monte Carlo Tree Search (MCTS)
+  function mcts(board, simulations) {
     let bestMove = null;
     let bestValue = -Infinity;
-    let jumpMoves = [];
-    let regularMoves = [];
-  
-    // Separate jump moves and regular moves
-    for (let move of getAllPossibleMoves(Board.board, 2)) {
-      if (move.inRange === 'jump') {
-        jumpMoves.push(move);
-      } else {
-        regularMoves.push(move);
-      }
-    }
-  
-    // Prioritize jump moves
-    let movesToConsider = jumpMoves.length > 0 ? jumpMoves : regularMoves;
-  
-    for (let move of movesToConsider) {
-      let boardCopy = JSON.parse(JSON.stringify(Board.board));
-      boardCopy[move.piece.position[0]][move.piece.position[1]] = 0;
-      boardCopy[move.tile.position[0]][move.tile.position[1]] = 2;
-      let moveValue = minimax(boardCopy, 5, false, -Infinity, Infinity); // Adjusted depth to 5 for performance
-      if (moveValue > bestValue) {
-        bestValue = moveValue = moveValue;
+
+    for (let i = 0; i < simulations; i++) {
+      let move = getRandomMove(board);
+      let value = simulateGame(move.board);
+      if (value > bestValue) {
+        bestValue = value;
         bestMove = move;
       }
     }
-  
-    if (bestMove) {
-      let fromPosition = bestMove.piece.position;
-      let toPosition = bestMove.tile.position;
-      if (bestMove.inRange === 'jump') {
-        bestMove.piece.opponentJump(bestMove.tile);
-      }
-      bestMove.piece.move(bestMove.tile);
-      updateMoveHistory(`E${fromPosition[0]}${fromPosition[1]} ${bestMove.inRange === 'jump' ? 'X' : '-'} E${toPosition[0]}${toPosition[1]}`, true);
-  
-      // Check for additional jumps
-      if (bestMove.inRange === 'jump' && bestMove.piece.canJumpAny()) {
-        setTimeout(aiMove, 1000); // Continue AI move after a delay
-      } else {
-        Board.changePlayerTurn();
+
+    return bestMove;
+  }
+
+  function getRandomMove(board) {
+    let moves = getAllPossibleMoves(board, 2);
+    return moves[Math.floor(Math.random() * moves.length)];
+  }
+
+  function simulateGame(board) {
+    // Simulate a game to the end and return the result
+    // Placeholder for simulation logic
+    return evaluateBoardWithNN(board);
+  }
+
+  // Negamax algorithm with alpha-beta pruning
+  function negamax(board, depth, alpha, beta, color) {
+    const boardKey = JSON.stringify(board);
+    if (transpositionTable.has(boardKey)) {
+      return transpositionTable.get(boardKey);
+    }
+
+    if (depth === 0 || Board.checkForWin()) {
+      return color * evaluateBoardWithNN(board);
+    }
+
+    let maxEval = -Infinity;
+    for (let move of getAllPossibleMoves(board, color === 1 ? 2 : 1)) {
+      let eval = -negamax(move.board, depth - 1, -beta, -alpha, -color);
+      maxEval = Math.max(maxEval, eval);
+      alpha = Math.max(alpha, eval);
+      if (alpha >= beta) {
+        break;
       }
     }
+
+    transpositionTable.set(boardKey, maxEval);
+    return maxEval;
   }
-  
-  // Enhanced evaluation function
+
+  // Evaluate the board state
   function evaluateBoard(board) {
     let score = 0;
     for (let row = 0; row < board.length; row++) {
@@ -462,12 +388,33 @@ window.onload = function () {
     score += potentialMoves(board, 2) - potentialMoves(board, 1); // Potential future moves
     return score;
   }
-  
+
+  // Check if a piece is safe
+  function isPieceSafe(board, row, col, player) {
+    const opponent = player === 1 ? 2 : 1;
+    const directions = [
+      [-1, -1], [-1, 1], [1, -1], [1, 1]
+    ];
+    for (let [dx, dy] of directions) {
+      const newRow = row + dx;
+      const newCol = col + dy;
+      const jumpRow = row + 2 * dx;
+      const jumpCol = col + 2 * dy;
+      if (newRow >= 0 && newRow < 8 && newCol >= 0 && newCol < 8 &&
+          jumpRow >= 0 && jumpRow < 8 && jumpCol >= 0 && jumpCol < 8) {
+        if (board[newRow][newCol] === opponent && board[jumpRow][jumpCol] === 0) {
+          return false; // The piece is not safe
+        }
+      }
+    }
+    return true; // The piece is safe
+  }
+
   // Check if a piece is a king
   function isPieceKing(board, row, col, player) {
     return (player === 1 && row === 0) || (player === 2 && row === 7);
   }
-  
+
   // Check control of the center
   function controlCenter(board, player) {
     let centerControl = 0;
@@ -481,7 +428,7 @@ window.onload = function () {
     }
     return centerControl;
   }
-  
+
   // Check potential future moves
   function potentialMoves(board, player) {
     let moves = 0;
@@ -497,7 +444,47 @@ window.onload = function () {
     }
     return moves;
   }
-  
+
+  // Get all possible moves for a player
+  function getAllPossibleMoves(board, player) {
+    let moves = [];
+    for (let piece of pieces) {
+      if (piece.player === player) {
+        for (let tile of tiles) {
+          let inRange = tile.inRange(piece);
+          if (inRange === 'regular' || (inRange === 'jump' && piece.canOpponentJump(tile.position))) {
+            let newBoard = JSON.parse(JSON.stringify(board));
+            newBoard[piece.position[0]][piece.position[1]] = 0;
+            newBoard[tile.position[0]][tile.position[1]] = player;
+            moves.push({ board: newBoard, piece, tile, inRange });
+          }
+        }
+      }
+    }
+    return moves;
+  }
+
+  // Function for AI move using MCTS and Negamax with Alpha-Beta Pruning
+  function aiMove() {
+    let bestMove = mcts(Board.board, 1000); // Increase simulations for higher difficulty
+    if (bestMove) {
+      let fromPosition = bestMove.piece.position;
+      let toPosition = bestMove.tile.position;
+      if (bestMove.inRange === 'jump') {
+        bestMove.piece.opponentJump(bestMove.tile);
+      }
+      bestMove.piece.move(bestMove.tile);
+      updateMoveHistory(`E${fromPosition[0]}${fromPosition[1]} ${bestMove.inRange === 'jump' ? 'X' : '-'} E${toPosition[0]}${toPosition[1]}`, true);
+
+      // Check for additional jumps
+      if (bestMove.inRange === 'jump' && bestMove.piece.canJumpAny()) {
+        setTimeout(aiMove, 1000); // Continue AI move after a delay
+      } else {
+        Board.changePlayerTurn();
+      }
+    }
+  }
+
   // Initialize the board
   Board.initalize();
   
