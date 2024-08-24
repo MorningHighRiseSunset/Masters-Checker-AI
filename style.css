@@ -1,48 +1,59 @@
-body {
-  font-family: Arial, sans-serif;
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  height: 100vh;
-  margin: 0;
-  background-color: #f0f0f0;
+.half_transparent {
+    -khtml-opacity: .50;
+    -moz-opacity: .50;
+    -ms-filter: "alpha(opacity=50)";
+    -ms-opacity: .50;
+    filter: alpha(opacity=50);
+    opacity: .50;
 }
 
-#checkersBoard {
-  box-shadow: 0 0 10px rgba(0, 0, 0, 0.5);
-  border: 20px solid #000; /* Increase the border size to 20px */
+.mainfont, .default_font {
+    font-family: Tahoma;
+    font-size: smaller;
+    font-variant: normal;
+    font-weight: normal;
+    color: Navy;
 }
 
-.cell {
-  stroke: #000;
-  stroke-width: 1px;
+.clickable {
+    cursor: pointer;
 }
 
-.cell.white {
-  fill: #ffffff;
+table.defined {
+    border-top-style: solid;
+    border-right-style: solid;
+    border-left-style: solid;
+    border-bottom-style: solid;
+    background-color: #ffffcc;
 }
 
-.cell.black {
-  fill: #005d9b;
+.smallfont {
+    font-family: Tahoma;
+    font-size: smaller;
 }
 
-.piece {
-  stroke: #000;
-  stroke-width: 1px;
+.err {
+    color: #ff6666;
+    font-family: Tahoma;
+    font-size: smaller;
 }
 
-.piece.red .outer {
-  fill: #ffffff; /* Outer circle for red piece */
+.mainheader {
+    font-family: Tahoma;
+    font-size: small;
+    font-variant: normal;
+    font-weight: bold;
+    color: rgb(103, 102, 187);
 }
 
-.piece.red .inner {
-  fill: #000000; /* Inner circle for red piece */
+.subheader {
+    font-family: Tahoma;
+    font-size: smaller;
+    font-variant: normal;
+    font-weight: normal;
+    color: Gray;
 }
 
-.piece.black .outer {
-  fill: #000000; /* Outer circle for black piece */
-}
-
-.piece.black .inner {
-  fill: #ffffff; /* Inner circle for black piece */
+#tblMoves td {
+    border: none;
 }
