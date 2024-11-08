@@ -1,1077 +1,1069 @@
-window.onload = function () {
-  // The initial setup
-  var gameBoard = [
-    [0, 1, 0, 1, 0, 1, 0, 1],
-    [1, 0, 1, 0, 1, 0, 1, 0],
-    [0, 1, 0, 1, 0, 1, 0, 1],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [0, 0, 0, 0, 0, 0, 0, 0],
-    [2, 0, 2, 0, 2, 0, 2, 0],
-    [0, 2, 0, 2, 0, 2, 0, 2],
-    [2, 0, 2, 0, 2, 0, 2, 0]
-  ];
-  // Arrays to store the instances
-  var pieces = [];
-  var tiles = [];
-  
-  // Array to store moves
-  var moveHistory = [];
-  var moveList = []; // New array to store moves in SAN format
+var red = 1;
+var redKing = 1.1
+var black = -1;
+var blackKing = -1.1
+var empty = 0;
+var player = red;
+var computer = black;
+var currentBoard = {};
+var INFINITY = 10000;
+var NEG_INFINITY = -10000;
+var cell_width = 0;
+var board_origin = 0;
 
-  // Function to get tile number based on position
-function getTileNumber(position) {
-  if (!position || position.length !== 2) return null; // Ensure position is valid
-  for (let i = 0; i < tiles.length; i++) {
-    if (tiles[i].position[0] === position[0] && tiles[i].position[1] === position[1]) {
-      return i + 1; // Tile numbers are 1-based
-    }
-  }
-  return null;
+function initializeBoard() {
+	var initialBoard = [[red, empty, red, empty, red, empty, red, empty],
+						[empty, red, empty, red, empty, red, empty, red],
+						[red, empty, red, empty, red, empty, red, empty],
+						[empty, empty, empty, empty, empty, empty, empty, empty],
+						[empty, empty, empty, empty, empty, empty, empty, empty],
+						[empty, black, empty, black, empty, black, empty, black],
+						[black, empty, black, empty, black, empty, black, empty],
+						[empty, black, empty, black, empty, black, empty, black]
+					   ];
+
+	var cells = new Array();
+	var pieces = new Array();
+	for (var i=0;i<initialBoard.length;i++){
+		var row = initialBoard[i];
+		for (var j=0;j<row.length;j++) {
+			var colValue=row[j];
+			if (colValue != empty) {
+				var piece = {row: i, col: j, state: colValue};
+				pieces.push(piece);
+			}
+			var cell = {row: i, col: j, state: colValue};
+			cells.push(cell);
+		}
+	}
+
+	return {cells: cells, pieces: pieces, turn: red};
 }
 
-// Function to update move history
-function updateMoveHistory(fromPosition, toPosition, isJump, player) {
-  const fromTileNumber = getTileNumber(fromPosition);
-  const toTileNumber = getTileNumber(toPosition);
-  if (fromTileNumber === null || toTileNumber === null) return; // Ensure tile numbers are valid
-  const move = `${fromTileNumber} ${isJump ? 'X' : '-'} ${toTileNumber}`;
-  
-  // Determine player name and color based on the current player's turn
-  const playerName = player === 1 ? 'Player 1' : 'Player 2';
-  const playerColor = player === 1 ? 'player1-color' : 'player2-color';
-  const moveText = `<span class="${playerColor}">${playerName}</span>: ${move}`;
-  
-  // Check if the last move is the same as the current move
-  if (moveHistory.length === 0 || moveHistory[moveHistory.length - 1] !== move) {
-    // Check if a regular move exists and replace it with a jump if necessary
-    const regularMove = `${fromTileNumber} - ${toTileNumber}`;
-    if (isJump && moveHistory.includes(regularMove)) {
-      const index = moveHistory.indexOf(regularMove);
-      moveHistory[index] = move;
-      moveList[index] = { san: moveText };
-      $('#moveHistory div').eq(index).html(moveText);
-    } else {
-      moveHistory.push(move);
-      moveList.push({ san: moveText }); // Store move in SAN format
-      $('#moveHistory').append("<div>" + moveText + "</div>"); // Assuming you have a div with id 'moveHistory'
-    }
-    // Scroll to the bottom of the move history
-    $('#moveHistory').scrollTop($('#moveHistory')[0].scrollHeight);
-  }
+function mapCellToCoordinates(origin, width, cell) {
+	var key = "" + cell.row + ":" + cell.col;
+	if (!mapCellToCoordinates.answers) mapCellToCoordinates.answers = {};
+	if (mapCellToCoordinates.answers[key] != null){
+		return mapCellToCoordinates.answers[key];
+	}
+	var x = origin.x + (cell.col * width);
+	var y = origin.y + (cell.row * width);
+	return mapCellToCoordinates.answers[key] = {x: x , y: y};
 }
-  // Distance formula
-  var dist = function (x1, y1, x2, y2) {
-    return Math.sqrt(Math.pow((x1 - x2), 2) + Math.pow((y1 - y2), 2));
-  }
 
-  // Piece object
-  function Piece(element, position) {
-    this.allowedtomove = true;
-    this.element = element;
-    this.position = position;
-    this.player = this.element.attr("id") < 12 ? 1 : 2;
-    this.king = false;
+function mapCoordinatesToCell(origin, width, cells, x, y){
+	var numSquares = 8;
+	var boardLength = numSquares * width;
+	if (x > (origin.x + boardLength)) return null;
+	if (y > (origin.y + boardLength)) return null;
+	var col = Math.ceil((x - origin.x) / width) - 1;
+	var row = Math.ceil((y - origin.y) / width) - 1;
+	var index = ((row * numSquares) + col);
+	var cell = cells[index];
 
-    this.makeKing = function () {
-      this.element.css("backgroundImage", "url('img/king" + this.player + ".png')");
-      this.king = true;
-      console.log("Player " + this.player + "'s piece has been crowned a king!");
-      console.log("Piece reached the opposite side and became a king!");
-      updateMoveHistory(this.position, this.position, false, this.player); // Pass player
+	return cell;
+}
+
+function startGame(origin, cellWidth, boardCanvas) {
+    movePiece.moves = [];
+    d3.select("#btnReplay").style("display", "none");
+    cell_width = cellWidth;
+    board_origin = origin;
+    currentBoard = drawBoard(origin, cellWidth, boardCanvas);
+    currentBoard.ui = true;
+    showBoardState();
+
+    // Add print button
+    d3.select("#printMoves").remove();
+    d3.select("body").append("button")
+        .attr("id", "printMoves")
+        .style("position", "absolute")
+        .style("left", "20px") // Position on the left side
+        .style("top", "35px") // Adjust top position to be under "Start New Game"
+        .text("Print Moves")
+        .on("click", function() {
+            var movesText = movePiece.moves.map((move, index) => 
+                `Move ${index + 1}: (${move.from.row},${move.from.col}) to (${move.to.row},${move.to.col})`
+            ).join("<br>");
+            
+            // Create a new window for printing
+            var printWindow = window.open('', '', 'height=400,width=600');
+            printWindow.document.write('<html><head><title>Move History</title></head><body>');
+            printWindow.document.write('<h1>Move History</h1>');
+            printWindow.document.write(movesText);
+            printWindow.document.write('</body></html>');
+            printWindow.document.close();
+            printWindow.print();
+        });
+}
+
+function replayAll(origin, cellWidth, boardCanvas) {
+	var allMoves = movePiece.moves;
+	startGame(origin, cellWidth, boardCanvas);
+	currentBoard.turn = 0; // can't really play
+	for (var i=0; i<allMoves.length; i++) {
+		var moveNum = i+1;
+		var nextMove = allMoves[i];
+		if (nextMove.to.row > -1){
+			var cellCoordinates = mapCellToCoordinates(board_origin, cell_width, nextMove.to);
+			d3.selectAll("circle").each(function(d,i) {
+				if (d.col === nextMove.from.col && d.row === nextMove.from.row){
+					d3.select(this)
+					.transition()
+					.delay(500 * moveNum)
+					.attr("cx", d.x = cellCoordinates.x + cell_width/2)
+					.attr("cy", d.y = cellCoordinates.y + cell_width/2);
+
+					d.col = nextMove.to.col;
+					d.row = nextMove.to.row;
+				}
+			});
+		}
+		else {
+			d3.selectAll("circle").each(function(d,i) {
+				if (d.row === nextMove.from.row && d.col === nextMove.from.col){
+					d3.select(this).transition().delay(500 * moveNum)
+						.style("display", "none");
+					d.col = -1;
+					d.row = -1;
+				}
+			});
+		}
+	}
+}
+
+function undoMove(move, moveNum) {
+	if (move.to.row > -1){
+		var cellCoordinates = mapCellToCoordinates(board_origin, cell_width, move.from);
+		d3.selectAll("circle").each(function(d,i) {
+			if (d.col === move.to.col && d.row === move.to.row){
+				d3.select(this)
+				.transition()
+				.delay(500 * moveNum)
+				.attr("cx", d.x = cellCoordinates.x + cell_width/2)
+				.attr("cy", d.y = cellCoordinates.y + cell_width/2);
+
+				d.col = move.from.col;
+				d.row = move.from.row;
+			}
+		});
+		var toIndex = getCellIndex(move.to.row, move.to.col);
+		var cell = currentBoard.cells[toIndex];
+		cell.state = 0;
+		var fromIndex = getCellIndex(move.from.row, move.from.col);
+		cell = currentBoard.cells[fromIndex];
+		cell.state = move.piece.state;
+		//var pieceIndex = getPieceIndex(currentBoard.pieces, move.to.row, move.to.col);
+		//var piece = currentBoard.pieces[pieceIndex];
+		//piece.col = move.from.col;
+		//piece.row = move.from.row; 
+
+	}
+	else {
+		d3.selectAll("circle").each(function(d,i) {
+			if (d.lastRow === move.from.row && d.lastCol === move.from.col){
+				d3.select(this).transition().delay(500 * moveNum)
+					.style("display", "block");
+				d.col = move.from.col;
+				d.row = move.from.row;
+
+				var fromIndex = getCellIndex(move.from.row, move.from.col);
+				var cell = currentBoard.cells[fromIndex];
+				cell.state = move.piece.state;
+				var pieceIndex = getPieceIndex(currentBoard.pieces, move.from.row, move.from.col);
+				var piece = currentBoard.pieces[pieceIndex];
+				piece.col = move.from.col;
+				piece.row = move.from.row; 
+				piece.state = move.piece.state;
+			}
+		});
+	}
+
+}
+
+function undo(numBack) {
+	var computerUndo = 0;
+	var lastTurn = player;
+	var moveNum = 0;
+	while (true) {
+		moveNum += 1;
+		var lastMove = movePiece.moves.pop();
+		if (lastMove == null) {
+			break;
+		}
+		if (lastTurn === player && lastMove.piece.state === computer) {
+			computerUndo += 1
+			if (computerUndo > numBack) {
+				break;
+			}
+		}
+		if (lastMove.to.col > -1) {
+			lastTurn = lastMove.piece.state;
+		}
+		undoMove(lastMove, moveNum);
+		showBoardState();
+	}
+}
+
+function movePiece(boardState, piece, fromCell, toCell, moveNum) {
+	if (boardState.ui) {
+		if (movePiece.moves == null) {
+			movePiece.moves = [];
+		}
+		movePiece.moves.push({piece: { col: piece.col, row: piece.row, state: piece.state}, 
+										from: {col: fromCell.col, row: fromCell.row}, 
+										to: {col: toCell.col, row: toCell.row}});
+	}
+
+	// Get jumped piece
+	var jumpedPiece = getJumpedPiece(boardState.cells, boardState.pieces, fromCell, toCell);
+
+	// Update states
+	var fromIndex = getCellIndex(fromCell.row, fromCell.col);
+	var toIndex = getCellIndex(toCell.row, toCell.col);
+	if ((toCell.row === 0 || toCell.row === 8) && Math.abs(piece.state) === 1) {
+		boardState.cells[toIndex].state = piece.state * 1.1;
+	}
+	else {
+		boardState.cells[toIndex].state = piece.state;
+	}
+	boardState.cells[fromIndex].state = empty;
+	if ((toCell.row === 0 || toCell.row === 7) && Math.abs(piece.state) === 1) {
+		piece.state = piece.state * 1.1
+	}
+	piece.col = toCell.col;
+	piece.row = toCell.row;
+
+	if (boardState.ui && (boardState.turn === computer || moveNum > 1)) {
+		moveCircle(toCell, moveNum);
+	}
+
+	if (jumpedPiece != null) {
+		var jumpedIndex = getPieceIndex(boardState.pieces, jumpedPiece.row, jumpedPiece.col);
+		var originialJumpPieceState = jumpedPiece.state;
+		jumpedPiece.state = 0;
+
+		var cellIndex = getCellIndex(jumpedPiece.row, jumpedPiece.col);
+		var jumpedCell = boardState.cells[cellIndex];
+		jumpedCell.state = empty;
+		boardState.pieces[jumpedIndex].lastCol = boardState.pieces[jumpedIndex].col;
+		boardState.pieces[jumpedIndex].lastRow = boardState.pieces[jumpedIndex].row;
+		boardState.pieces[jumpedIndex].col = -1;
+		boardState.pieces[jumpedIndex].row = -1;
+		if (boardState.ui) {
+			hideCircle(jumpedCell, moveNum);
+		}
+
+		if (boardState.ui) {
+			movePiece.moves.push({piece: { col: jumpedPiece.col, row: jumpedPiece.row, state: originialJumpPieceState}, 
+											from: {col: jumpedCell.col, row: jumpedCell.row}, 
+											to: {col: -1, row: -1}});
+		}
+
+		// Another jump?
+		var more_moves = get_available_piece_moves(boardState, piece, boardState.turn);
+		var another_move = null;
+		for (var i=0; i<more_moves.length; i++) {
+			more_move = more_moves[i];
+			if (more_move.move_type === "jump") {
+				another_move = more_move;
+				break;
+			}
+		}
+		if (another_move != null) {
+			moveNum += 1;
+			boardState = movePiece(boardState, piece, another_move.from, another_move.to, moveNum);
+			if (boardState.ui && boardState.turn === player) {
+				boardState.numPlayerMoves += moveNum;
+			}
+		}
+	}
+
+
+	return boardState;
+}
+
+function getCellIndex(row, col) {
+	var numSquares = 8;
+	var index = ((row * numSquares) + col);
+	return index;
+}
+
+function getPieceIndex(pieces, row, col) {
+	var index = -1;
+	for (var i=0; i<pieces.length;i++){
+		var piece = pieces[i];
+		if (piece.row===row && piece.col===col){
+			index = i;
+			break;
+		}
+	}
+	return index;
+}
+
+function getPieceCount(boardState) {
+	var numRed = 0;
+	var numBlack = 0;
+	var pieces = boardState.pieces;
+	for (var i=0;i<pieces.length;i++) {
+		var piece = pieces[i];
+		if (piece.col >=0 && piece.row >=0){
+			if (piece.state === red || piece.state === redKing) {
+				numRed += 1;
+			}
+			else if (piece.state === black || piece.state === blackKing) {
+				numBlack += 1;
+			}
+		}
+	}
+
+	return {red: numRed, black: numBlack};
+}
+
+function getScore(boardState) {
+	var pieceCount = getPieceCount(boardState);
+	var score = pieceCount.red - pieceCount.black;
+	return score;
+}
+
+function getWinner(boardState) {
+	var pieceCount = getPieceCount(boardState);
+	if (pieceCount.red > 0  && pieceCount.black === 0) {
+		return red;
+	}
+	else if (pieceCount.black > 0 && pieceCount.red === 0) {
+		return black;
+	}
+	else return 0;
+}
+
+/* SIDE EFFECT FUNCTIONS: UI and Board State */
+function dragStarted(d) {
+	d3.select(this).classed("dragging", true);
+}
+
+function dragged(d) {
+	if (currentBoard.gameOver) return;
+	if (currentBoard.turn != red && currentBoard.turn != redKing) return;
+	if (currentBoard.turn != player) return;
+	var c = d3.select(this);
+	d3.select(this)
+		.attr("cx", d.x = d3.event.x)
+		.attr("cy", d.y = d3.event.y);
+}
+
+function moveCircle(cell, moveNum) {
+	var cellCoordinates = mapCellToCoordinates(board_origin, cell_width, cell);
+	currentBoard.delay = (moveNum * 500) + 500;
+	d3.selectAll("circle").each(function(d,i) {
+		if (d.col === cell.col && d.row === cell.row){
+			d3.select(this)
+			.transition()
+			.delay(500 * moveNum)
+			.attr("cx", d.x = cellCoordinates.x + cell_width/2)
+			.attr("cy", d.y = cellCoordinates.y + cell_width/2);
+		}
+	});
+}
+
+function hideCircle(cell, moveNum) {
+	currentBoard.delay = (moveNum * 600) + 500;
+	d3.selectAll("circle").each(function(d,i) {
+		if (d.state === 0 && d.lastRow === cell.row && d.lastCol === cell.col){
+			console.log("Hide col=" + cell.col + ", row=" + cell.row);
+			d3.select(this).transition().delay(600 * moveNum)
+				.style("display", "none");
+		}
+	});
+}
+
+function dragEnded(origin, width, node, d) {
+	if (currentBoard.turn != red && currentBoard.turn != redKing) return;
+	if (currentBoard.turn != player) return;
+	var cell = mapCoordinatesToCell(origin, width, currentBoard.cells, d.x, d.y);
+	var from = d;
+	var to = cell;
+	var legal = isMoveLegal(currentBoard.cells, currentBoard.pieces, d, from, to);
+	var index = getCellIndex(d.row, d.col);
+	var originalCell = currentBoard.cells[index];
+	if (!legal) {
+		var cellCoordinates = mapCellToCoordinates(origin, width, originalCell);
+		node
+			.attr("cx", d.x = cellCoordinates.x + width/2)
+			.attr("cy", d.y = cellCoordinates.y + width/2);
+	}
+	else {
+		// Update global board state
+		currentBoard = movePiece(currentBoard, d, originalCell, cell, 1);
+
+		// Center circle in cell
+		var cellCoordinates = mapCellToCoordinates(origin, width, cell);
+		node
+			.attr("cx", d.x = cellCoordinates.x + width/2)
+			.attr("cy", d.y = cellCoordinates.y + width/2);
+
+		var score = getScore(currentBoard);
+		showBoardState();
+
+		currentBoard.turn = computer;
+
+		// Computer's move
+		var delayCallback = function() {
+			var winner = getWinner(currentBoard);
+			if (winner != 0) {
+				currentBoard.gameOver = true;
+			}
+			else {
+				computerMove();
+			}
+			updateScoreboard();
+	        return true;
+		};
+
+		var moveDelay = currentBoard.delay;
+		setTimeout(delayCallback, moveDelay);		
+
+	}
+}
+/* END SIDE EFFECT FUNCTIONS */
+
+function getJumpedPiece(cells, pieces, from, to) {
+    var distance = {x: to.col-from.col,y: to.row-from.row};
+    if (abs(distance.x) == 2) {
+		var jumpRow = from.row+sign(distance.y);
+		var jumpCol = from.col+sign(distance.x);
+		var index = getPieceIndex(pieces, jumpRow, jumpCol);
+		var jumpedPiece = pieces[index];
+		return jumpedPiece;
     }
-    
+    else return null;
 
-    this.move = function (tile) {
-      this.element.removeClass('selected');
-      if (!Board.isValidPlacetoMove(tile.position[0], tile.position[1])) return false;
-    
-      if ((this.player == 1 && !this.king && tile.position[0] < this.position[0]) ||
-          (this.player == 2 && !this.king && tile.position[0] > this.position[0])) {
+}
+
+function isMoveLegal(cells, pieces, piece, from, to) {
+    if ((to.col < 0) || (to.row < 0) || (to.col > 7) || (to.row > 7)) {
+    	//console.log("ILLEGAL MOVE: piece going off board");
         return false;
-      }
-    
-      const fromPosition = this.position.slice();
-    
-      Board.board[this.position[0]][this.position[1]] = 0;
-      Board.board[tile.position[0]][tile.position[1]] = this.player;
-      this.position = [tile.position[0], tile.position[1]];
-      this.element.css('top', Board.dictionary[this.position[0]]);
-      this.element.css('left', Board.dictionary[this.position[1]]);
-    
-      if (!this.king && (this.position[0] == 0 || this.position[0] == 7)) {
-        this.makeKing();
-      }
-    
-      updateMoveHistory(fromPosition, this.position, false, this.player); // Pass player
-    
-      return true;
-    };
-
-    this.canJumpAny = function () {
-      return (this.canOpponentJump([this.position[0] + 2, this.position[1] + 2]) ||
-              this.canOpponentJump([this.position[0] + 2, this.position[1] - 2]) ||
-              this.canOpponentJump([this.position[0] - 2, this.position[1] + 2]) ||
-              this.canOpponentJump([this.position[0] - 2, this.position[1] - 2]));
-    };
-
-    this.canOpponentJump = function (newPosition) {
-      var dx = newPosition[1] - this.position[1];
-      var dy = newPosition[0] - this.position[0];
-    
-      // Ensure object doesn't go backwards if not a king
-      if ((this.player == 1 && !this.king && newPosition[0] < this.position[0]) ||
-          (this.player == 2 && !this.king && newPosition[0] > this.position[0])) {
+    }
+    var distance = {x: to.col-from.col,y: to.row-from.row};
+    if ((distance.x == 0) || (distance.y == 0)) {
+    	//console.log("ILLEGAL MOVE: horizontal or vertical move");
         return false;
-      }
+    }
+    if (abs(distance.x) != abs(distance.y)) {
+    	//console.log("ILLEGAL MOVE: non-diagonal move");
+        return false;
+    }
+    if (abs(distance.x) > 2) {
+    	//console.log("ILLEGAL MOVE: more than two diagonals");
+        return false;
+    }
+    /* TODO: handle double jump
+    if ((abs(distance.x) == 1) && double_jump) {
+        return false;
+    }
+    */
+    if (to.state != empty) {
+    	//console.log("ILLEGAL MOVE: cell is not empty");
+        return false;
+    }
+    if (abs(distance.x) == 2) {
+    	var jumpedPiece = getJumpedPiece(cells, pieces, from, to);
+    	if (jumpedPiece == null) {
+    		//console.log("ILLEGAL MOVE: no piece to jump");
+    		return false;
+    	}
+		var pieceState = integ(piece.state);
+		var jumpedState = integ(jumpedPiece.state);
+        if (pieceState != -jumpedState) {
+	    	//console.log("ILLEGAL MOVE: can't jump own piece");
+        	return false;
+    	}
+    }
+    if ((integ(piece.state) === piece.state) && (sign(piece.state) != sign(distance.y))) {
+    	//console.log("ILLEGAL MOVE: wrong direction");
+        return false;
+    }
+
+    return true;
+}
+
+
+function drawBoard(origin, cellWidth, boardCanvas) {
+    var boardState = initializeBoard();
+    var cells = boardState.cells;
+    var pieces = boardState.pieces;
+
+    // Increase the size of the boardCanvas
+    var boardSize = cellWidth * 8; // Assuming an 8x8 board
+    boardCanvas.attr("width", boardSize)
+               .attr("height", boardSize)
+               .style("position", "absolute")
+               .style("left", "50%")
+               .style("top", "50%")
+               .style("transform", "translate(-50%, -50%)")
+               .style("border-radius", "10px") // Rounded corners
+               .style("box-shadow", "0 5px 15px rgba(0, 0, 0, 0.3)"); // Subtle shadow effect
+
+    // Define gradients for pieces
+    var defs = boardCanvas.append("defs");
+
+    var redGradient = defs.append("radialGradient")
+                          .attr("id", "redGradient")
+                          .attr("cx", "50%")
+                          .attr("cy", "50%")
+                          .attr("r", "50%")
+                          .attr("fx", "50%")
+                          .attr("fy", "50%");
+    redGradient.append("stop").attr("offset", "0%").attr("style", "stop-color:#FF6347;stop-opacity:1"); // Tomato
+    redGradient.append("stop").attr("offset", "100%").attr("style", "stop-color:#B22222;stop-opacity:1"); // Firebrick
+
+    var blackGradient = defs.append("radialGradient")
+                            .attr("id", "blackGradient")
+                            .attr("cx", "50%")
+                            .attr("cy", "50%")
+                            .attr("r", "50%")
+                            .attr("fx", "50%")
+                            .attr("fy", "50%");
+    blackGradient.append("stop").attr("offset", "0%").attr("style", "stop-color:#696969;stop-opacity:1"); // Dim gray
+    blackGradient.append("stop").attr("offset", "100%").attr("style", "stop-color:#000000;stop-opacity:1"); // Black
+
+    // Define drop shadow filter
+    var filter = defs.append("filter")
+                     .attr("id", "dropShadow")
+                     .attr("height", "150%");
+    filter.append("feGaussianBlur")
+          .attr("in", "SourceAlpha")
+          .attr("stdDeviation", 2); // Softer blur for a gentle shadow
+    filter.append("feOffset")
+          .attr("dx", 1)
+          .attr("dy", 1)
+          .attr("result", "offsetblur");
+    filter.append("feMerge")
+          .append("feMergeNode")
+          .attr("in", "offsetblur");
+    filter.append("feMerge")
+          .append("feMergeNode")
+          .attr("in", "SourceGraphic");
+
+    // Draw cell rects with alternating colors
+    boardCanvas.append("g")
+               .selectAll("rect")
+               .data(cells)
+               .enter().append("rect")
+               .attr("x", function(d) { return mapCellToCoordinates(origin, cellWidth, d).x})
+               .attr("y", function(d) { return mapCellToCoordinates(origin, cellWidth, d).y})
+               .attr("height", cellWidth)
+               .attr("width", cellWidth)
+               .style("fill", function(d, i) { return (d.row + d.col) % 2 === 0 ? "#FFFFFF" : "#000000"; }) // White and black tiles
+               .style("stroke", "black")
+               .style("stroke-width", "1px")
+               .style("border-radius", "3px"); // Rounded corners for cells
+
+    // Draw pieces
+    var dragEndedDimensions = function(d) {
+        node = d3.select(this);
+        dragEnded(origin, cellWidth, node, d);
+    }
+
+    var drag = d3.drag()
+                 .on("start", dragStarted)
+                 .on("drag", dragged)
+                 .on("end", dragEndedDimensions);
+
+    boardCanvas.append("g")
+               .selectAll("circle")
+               .data(pieces)
+               .enter().append("circle")
+               .attr("r", cellWidth/2.5)
+               .attr("cx", function(d) { var x = mapCellToCoordinates(origin, cellWidth, d).x; return x+cellWidth/2;})
+               .attr("cy", function(d) { var y = mapCellToCoordinates(origin, cellWidth, d).y; return y+cellWidth/2;})
+               .style("fill", function(d) { return d.state == red ? "url(#redGradient)" : "url(#blackGradient)"; })
+               .style("filter", "url(#dropShadow)")
+               .call(drag);
+
+        // Draw scoreboard
+		d3.select("#divScoreboard").remove();
+		d3.select("body").append("div")
+				   .attr("id", "divScoreboard")
+				   .style("font-size", "36px")
+				   .style("background", "linear-gradient(to bottom, #f0f8ff, #4682b4)") // Light blue to steel blue gradient
+				   .style("color", "#333")
+				   .style("padding", "20px")
+				   .style("border-radius", "10px")
+				   .style("box-shadow", "0 4px 8px rgba(0, 0, 0, 0.2)")
+				   .style("text-align", "center")
+				   .style("width", "300px")
+				   .style("margin", "20px auto")
+				   .html("SCOREBOARD");
+	
+		d3.select("#divScoreboard")
+			.append("div")
+			.style("font-size", "24px")
+			.style("margin-top", "10px")
+			.attr("id", "winner");
+	
+		d3.select("#divScoreboard")
+				   .append("div")
+				   .attr("id", "redScore")
+				   .style("font-size", "18px")
+				   .style("margin-top", "10px")
+				   .style("color", "#fff")
+				   .style("padding", "5px")
+				   .style("border-radius", "5px")
+				   .style("box-shadow", "0 2px 4px rgba(0, 0, 0, 0.1)")
+				   .html("Blue: 12");
+	
+		d3.select("#divScoreboard")
+				   .append("div")
+				   .attr("id", "blackScore")
+				   .style("font-size", "18px")
+				   .style("margin-top", "10px")
+				   .style("color", "#fff")
+				   .style("padding", "5px")
+				   .style("border-radius", "5px")
+				   .style("box-shadow", "0 2px 4px rgba(0, 0, 0, 0.1)")
+				   .html("Gray: 12");
+
+    return boardState;
+}
+
+function updateScoreboard() {
+	var pieceCount = getPieceCount(currentBoard);
+	var redLabel = "Red: " + pieceCount.red;
+	var blackLabel = "Black: " + pieceCount.black;
+
+	d3.select("#redScore")
+		.html(redLabel);
+	d3.select("#blackScore")
+		.html(blackLabel);
+
+	var winner = getWinner(currentBoard);
+	var winnerLabel = "";
+	if (winner === player) {
+		winnerLabel = "Red Wins!!";
+	}
+	else if (winner === computer) {
+		winnerLabel = "Black Wins!!";
+	}
+
+	if (winner != 0) {
+		d3.select("#btnReplay")
+			.style("display", "inline");
+	}
+
+	d3.select("#winner")
+		.html(winnerLabel);
+}
+
+function integ(num) {
+    if (num != null)
+        return Math.round(num);
+    else
+        return null;
+}
+
+function abs(num) {
+    return Math.abs(num);
+}
+
+function sign(num) {
+    if (num < 0) return -1;
+    else return 1;
+}
+
+function drawText(data) {
+	boardCanvas.append("g")
+				.selectAll("text")
+				.data(data)
+				.enter().append("text")
+				.attr("x", function(d) { var x = mapCellToCoordinates(board_origin, cell_width, d).x; return x+cell_width/2;})
+				.attr("y", function(d) { var y = mapCellToCoordinates(board_origin, cell_width, d).y; return y+cell_width/2;})
+				.style("fill", function(d) { if (d.state === red) return "black"; else return "white";})
+				.text(function(d) { /*if (d.state === red) return "R"; 
+									else if (d.state === black) return "B"; 
+									else*/ if (d.state === redKing || d.state === blackKing) return "K";
+									else return "";})
+				;
+}
+
+function showBoardState() {
+	d3.selectAll("text").each(function(d,i) {
+		d3.select(this)
+			.style("display", "none");
+	});
+
+	var cells = currentBoard.cells;
+	var pieces = currentBoard.pieces;
+	//drawText(cells);
+	drawText(pieces);
+}
+
+/* COMPUTER AI FUNCTIONS */
+function copy_board(board) {
+	var newBoard = {};
+	newBoard.ui = false;
+	var cells = new Array();
+	var pieces = new Array();
+
+	for (var i=0;i<board.cells.length;i++) {
+		var cell = board.cells[i];
+		var newCell = {row: cell.row, col: cell.col, state: cell.state};
+		cells.push(newCell);
+	}
+	for (var i=0;i<board.pieces.length;i++){
+		var piece = board.pieces[i];
+		var newPiece = {row: piece.row, col: piece.col, state: piece.state};
+		pieces.push(newPiece);
+	}
+
+	return {cells: cells, pieces: pieces, turn: board.turn};
+}
+
+function get_player_pieces(player, target_board) {
+	player_pieces = new Array();
+	for (var i=0;i<target_board.pieces.length;i++){
+		var piece = target_board.pieces[i];
+		if (piece.state === player || piece.state === (player+.1) || piece.state === (player-.1) ) {
+			player_pieces.push(piece);
+		}
+	}
+	return player_pieces;
+}
+
+function get_cell_index(target_board, col, row) {
+	var index = -1;
+	for (var i=0;i<target_board.cells.length;i++) {
+		var cell = target_board.cells[i];
+		if (cell.col === col && cell.row ===row) {
+			index = i;
+			break;
+		}
+	}
+	return index;
+}
+
+function get_available_piece_moves(target_board, target_piece, player) {
+    var moves = [];
+    var from = target_piece;
+
+	// check for slides
+	var x = [-1, 1];
+	x.forEach(function(entry) {
+		var cell_index = get_cell_index(target_board, from.col+entry, from.row+(player*1));
+		if (cell_index >= 0){
+	        var to = target_board.cells[cell_index];
+	        if (isMoveLegal(target_board.cells, target_board.pieces, from, from, to)) {
+	            move = {move_type: 'slide', piece: player, from: {col: from.col, row: from.row}, to: {col: to.col, row: to.row}};
+	            moves[moves.length] = move;
+	        }
+		}
+	});
+
+	// check for jumps
+	x = [-2, 2];
+	x.forEach(function(entry) {
+		var cell_index = get_cell_index(target_board, from.col+entry, from.row+(player*2));
+		if (cell_index >= 0) {
+	        var to = target_board.cells[cell_index];
+	        if (isMoveLegal(target_board.cells, target_board.pieces, from, from, to)) {
+	            move = {move_type: 'jump', piece: player, from: {col: from.col, row: from.row}, to: {col: to.col, row: to.row}};
+	            moves[moves.length] = move;
+	        }
+		}
+	});
+
+	// kings
+	if (Math.abs(from.state) === 1.1) {
+	    // check for slides
+	    var x = [-1, 1];
+	    var y = [-1, 1];
+	    x.forEach(function(xmove) {
+	        y.forEach(function(ymove){
+	        	var cell_index = get_cell_index(target_board, from.col+xmove, from.row+ymove);
+	        	if (cell_index >= 0){
+		            var to = target_board.cells[cell_index];
+		            if (isMoveLegal(target_board.cells, target_board.pieces, from, from, to)) {
+		                move = {move_type: 'slide', piece: player, from: {col: from.col, row: from.row}, to: {col: to.col, row: to.row}};
+		                moves[moves.length] = move;
+		            }
+	        	}
+	        });
+	    });
+
+	    // check for jumps
+	    x = [-2, 2];
+	    y = [-2, 2];
+	    x.forEach(function(xmove) {
+	        y.forEach(function(ymove){
+	        	var cell_index = get_cell_index(target_board, from.col+xmove, from.row+ymove);
+	        	if (cell_index >= 0){
+		            var to = target_board.cells[cell_index];
+		            if (isMoveLegal(target_board.cells, target_board.pieces, from, from, to)) {
+		                move = {move_type: 'jump', piece: player, from: {col: from.col, row: from.row}, to: {col: to.col, row: to.row}};
+		                moves[moves.length] = move;
+		            }
+	        	}
+	        });
+	    });
+	}
+
+	return moves;
+}
+
+function get_available_moves(player, target_board) {
+
+    var moves = [];
+    var move = null;
+    var player_pieces = get_player_pieces(player, target_board);
+
+    for (var i=0;i<player_pieces.length;i++) {
+    	var from = player_pieces[i];
+    	var piece_moves = get_available_piece_moves(target_board, from, player);
+    	moves.push.apply(moves, piece_moves);
+    }
+
+    //prune non-jumps, if applicable
+    var jump_moves = [];
+    for (var i=0; i<moves.length;i++) {
+        var move = moves[i];
+        if (move.move_type == "jump") {
+            jump_moves.push(move);
+        }
+    }
+    if (jump_moves.length > 0){
+        moves = jump_moves;
+    }
+
+    return moves;
+}
+
+function select_random_move(moves){
+    // Randomly select move
+    var index = Math.floor(Math.random() * (moves.length - 1));
+    var selected_move = moves[index];
+
+    return selected_move;
+}
+
+function alpha_beta_search(calc_board, limit) {
+    var alpha = NEG_INFINITY;
+    var beta = INFINITY;
+
+    //get available moves for computer
+    var available_moves = get_available_moves(computer, calc_board);
+
+    //get max value for each available move
+    var max = max_value(calc_board,available_moves,limit,alpha,beta);
+
+    //find all moves that have max-value
+    var best_moves = [];
+    var max_move = null;
+    for(var i=0;i<available_moves.length;i++){
+        var next_move = available_moves[i];
+        if (next_move.score == max){
+            max_move = next_move;
+            best_moves.push(next_move);
+        }
+    }
+
+    //randomize selection, if multiple moves have same max-value
+    if (best_moves.length > 1){
+        max_move = select_random_move(best_moves);
+    }
+
+    return max_move;
+}
+
+function computerMove() {
+
+    // Copy board into simulated board
+    var simulated_board = copy_board(currentBoard);
+
+    // Run algorithm to select next move
+    var selected_move = alpha_beta_search(simulated_board, 8);
+    console.log("best move: " + selected_move.from.col + ":" + selected_move.from.row + " to " + selected_move.to.col + ":" + selected_move.to.row);
     
-      // Must be in bounds
-      if (newPosition[0] > 7 || newPosition[1] > 7 || newPosition[0] < 0 || newPosition[1] < 0) return false;
-    
-      var tileToCheckx = this.position[1] + dx / 2;
-      var tileToChecky = this.position[0] + dy / 2;
-    
-      if (tileToCheckx > 7 || tileToChecky > 7 || tileToCheckx < 0 || tileToChecky < 0) return false;
-    
-      // If there is a piece there and there is no piece in the space after that
-      if (!Board.isValidPlacetoMove(tileToChecky, tileToCheckx) && Board.isValidPlacetoMove(newPosition[0], newPosition[1])) {
-        for (let pieceIndex in pieces) {
-          if (pieces[pieceIndex].position[0] == tileToChecky && pieces[pieceIndex].position[1] == tileToCheckx) {
-            if (this.player != pieces[pieceIndex].player) {
-              return pieces[pieceIndex]; // Return the piece sitting there
+    // Make computer's move
+	var pieceIndex = getPieceIndex(currentBoard.pieces, selected_move.from.row, selected_move.from.col);
+	var piece = currentBoard.pieces[pieceIndex];
+	currentBoard = movePiece(currentBoard, piece, selected_move.from, selected_move.to, 1);
+	moveCircle(selected_move.to, 1);
+	showBoardState();
+
+	var winner = getWinner(currentBoard);
+	if (winner != 0) {
+		currentBoard.gameOver = true;
+	}
+	else {
+		// Set turn back to human
+		currentBoard.turn = player;
+		currentBoard.delay = 0;
+	}
+}
+
+function jump_available(available_moves) {
+    var jump = false;
+    for (var i=0;i<available_moves.length;i++){
+        var move = available_moves[i];
+        if (move.move_type == "jump") {
+            jump = true;
+            break;
+        }
+    }
+
+    return jump;
+}
+
+function min_value(calc_board, human_moves, limit, alpha, beta) {
+    if (limit <=0 && !jump_available(human_moves)) {
+        return utility(calc_board);
+    }
+    var min = INFINITY;
+
+    //for each move, get min
+    if (human_moves.length > 0){
+        for (var i=0;i<human_moves.length;i++){
+            simulated_board = copy_board(calc_board);
+
+            //move human piece
+            var human_move = human_moves[i];
+			var pieceIndex = getPieceIndex(simulated_board.pieces, human_move.from.row, human_move.from.col);
+			var piece = simulated_board.pieces[pieceIndex];
+            simulated_board = movePiece(simulated_board, piece, human_move.from, human_move.to);
+
+            //get available moves for computer
+            var computer_moves = get_available_moves(computer, simulated_board);
+
+            //get max value for this move
+            var max_score = max_value(simulated_board, computer_moves, limit-1, alpha, beta);
+
+            //compare to min and update, if necessary
+            if (max_score < min) {
+                min = max_score;
             }
-          }
-        }
-      }
-      return false;
-    };
-
-    this.opponentJump = function (tile) {
-      var pieceToRemove = this.canOpponentJump(tile.position);
-      if (pieceToRemove) {
-        pieceToRemove.remove();
-        // Notify that a piece has been captured
-        console.log("Player " + pieceToRemove.player + "'s piece has been captured!");
-        return true;
-      }
-      return false;
-    };
-    
-
-    this.remove = function () {
-      this.element.css("display", "none");
-      if (this.player == 1) {
-        $('#player2').append("<div class='capturedPiece'></div>");
-        Board.score.player2 += 1;
-      } else {
-        $('#player1').append("<div class='capturedPiece'></div>");
-        Board.score.player1 += 1;
-      }
-      Board.board[this.position[0]][this.position[1]] = 0;
-      this.position = [];
-      Board.checkForWin();
-    }
-  }
-
-  // Tile object
-  function Tile(element, position) {
-    this.element = element;
-    this.position = position;
-
-    this.inRange = function (piece) {
-      for (let k of pieces)
-        if (k.position[0] == this.position[0] && k.position[1] == this.position[1]) return 'wrong';
-      if (!piece.king && piece.player == 1 && this.position[0] < piece.position[0]) return 'wrong';
-      if (!piece.king && piece.player == 2 && this.position[0] > piece.position[0]) return 'wrong';
-      if (dist(this.position[0], this.position[1], piece.position[0], piece.position[1]) == Math.sqrt(2)) {
-        return 'regular'; // Regular move
-      } else if (dist(this.position[0], this.position[1], piece.position[0], piece.position[1]) == 2 * Math.sqrt(2)) {
-        return 'jump'; // Jump move
-      }
-    };
-  }
-
-  // Board object
-  var Board = {
-    board: gameBoard,
-    score: {
-      player1: 0,
-      player2: 0
-    },
-    playerTurn: 1,
-    jumpexist: false,
-    continuousjump: false,
-    tilesElement: $('div.tiles'),
-    dictionary: ["0vmin", "10vmin", "20vmin", "30vmin", "40vmin", "50vmin", "60vmin", "70vmin", "80vmin", "90vmin"],
-    computerDifficulty: 'easy', // Default difficulty
-
-    // Initialize the 8x8 board
-    initalize: function () {
-      var countPieces = 0;
-      var countTiles = 0;
-      for (let row in this.board) {
-        for (let column in this.board[row]) {
-          if (row % 2 == 1) {
-            if (column % 2 == 0) {
-              countTiles = this.tileRender(row, column, countTiles);
+            human_moves[i].score = min;
+            if (min <= alpha) {
+                break;
             }
-          } else {
-            if (column % 2 == 1) {
-              countTiles = this.tileRender(row, column, countTiles);
+            if (min < beta) {
+                beta = min;
             }
-          }
-          if (this.board[row][column] == 1) {
-            countPieces = this.playerPiecesRender(1, row, column, countPieces);
-          } else if (this.board[row][column] == 2) {
-            countPieces = this.playerPiecesRender(2, row, column, countPieces);
-          }
         }
-      }
-      $('#difficultyMessage').text("EASY"); // Display initial difficulty message
-    },
+    }
+    else {
+        //log("NO MORE MOVES FOR MIN: l=" + limit);
+    }
 
-    tileRender: function (row, column, countTiles) {
-    this.tilesElement.append("<div class='tile' id='tile" + countTiles + "' style='top:" + this.dictionary[row] + ";left:" + this.dictionary[column] + ";'><span class='tile-number'>" + (countTiles + 1) + "</span></div>");
-    tiles[countTiles] = new Tile($("#tile" + countTiles), [parseInt(row), parseInt(column)]);
-    return countTiles + 1;
-  },
+    return min;
+}
 
-    playerPiecesRender: function (playerNumber, row, column, countPieces) {
-      $(`.player${playerNumber}pieces`).append("<div class='piece' id='" + countPieces + "' style='top:" + this.dictionary[row] + ";left:" + this.dictionary[column] + ";'></div>");
-      pieces[countPieces] = new Piece($("#" + countPieces), [parseInt(row), parseInt(column)]);
-      return countPieces + 1;
-    },
+function max_value(calc_board, computer_moves, limit, alpha, beta) {
+    if (limit <= 0 && !jump_available(computer_moves)) {
+        return utility(calc_board);
+    }
+    var max = NEG_INFINITY;
 
-    // Check if the location has an object
-    isValidPlacetoMove: function (row, column) {
-      if (row < 0 || row > 7 || column < 0 || column > 7) return false;
-      return this.board[row][column] == 0;
-    },
+    //for each move, get max
+    if (computer_moves.length > 0){
+        for (var i=0;i<computer_moves.length;i++){
+            simulated_board = copy_board(calc_board);
 
-    // Change the active player
-    changePlayerTurn: function () {
-      this.playerTurn = this.playerTurn == 1 ? 2 : 1;
-      $('.turn').css("background", this.playerTurn == 1 ? "linear-gradient(to right, #D3D3D3 50%, transparent 50%)" : "linear-gradient(to right, transparent 50%, #D3D3D3 50%)");
-      this.check_if_jump_exist();
-      if (this.playerTurn == 2) {
-        this.computerMove();
-      }
-    },
+            //move computer piece
+            var computer_move = computer_moves[i];
+			var pieceIndex = getPieceIndex(simulated_board.pieces, computer_move.from.row, computer_move.from.col);
+			var piece = simulated_board.pieces[pieceIndex];
+            simulated_board = movePiece(simulated_board, piece, computer_move.from, computer_move.to);
 
-    // Check for win conditions
-    checkForWin: function () {
-      if (this.score.player1 >= 12) {
-        // Record the win in move history instead of alerting
-        updateMoveHistory("Player 1 wins!");
-        this.showNewGameButton();
-      } else if (this.score.player2 >= 12) {
-        // Record the win in move history instead of alerting
-        updateMoveHistory("Player 2 wins!");
-        this.showNewGameButton();
-      }
-    },
+            //get available moves for human
+            var human_moves = get_available_moves(player, simulated_board);
 
-    showNewGameButton: function() {
-      $('#newGameBtn').show(); // Show the new game button
-    },
+            //get min value for this move
+            var min_score = min_value(simulated_board, human_moves, limit-1, alpha, beta);
+            computer_moves[i].score = min_score;
 
-
-    check_if_jump_exist: function () {
-      this.jumpexist = false;
-      this.continuousjump = false;
-      for (let k of pieces) {
-        k.allowedtomove = false;
-        if (k.position.length != 0 && k.player == this.playerTurn && k.canJumpAny()) {
-          this.jumpexist = true;
-          k.allowedtomove = true;
-        }
-      }
-      if (!this.jumpexist) {
-        for (let k of pieces) k.allowedtomove = true;
-      }
-    },
-
-    // Computer move logic
-    computerMove: function () {
-      // Implement different difficulty levels
-      switch (this.computerDifficulty) {
-        case 'easy':
-          this.computerEasyMove();
-          break;
-        case 'medium':
-          this.computerMediumMove();
-          break;
-        case 'hard':
-          this.computerHardMove();
-          break;
-      }
-    },
-
-    computerEasyMove: function () {
-      // Simple random move logic for easy difficulty
-      let possibleMoves = [];
-      for (let piece of pieces) {
-        if (piece.player == 2 && piece.allowedtomove) {
-          for (let tile of tiles) {
-            if (tile.inRange(piece) == 'regular' && this.isValidPlacetoMove(tile.position[0], tile.position[1])) {
-              possibleMoves.push({ piece: piece, tile: tile });
+            //compare to min and update, if necessary
+            if (min_score > max) {
+                max = min_score;
             }
-          }
-        }
-      }
-      if (possibleMoves.length > 0) {
-        let move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-        move.piece.move(move.tile);
-        updateMoveHistory("E" + move.piece.element.attr("id") + " - E" + move.tile.element.attr("id"));
-        this.changePlayerTurn();
-      }
-    },
-
-    computerMediumMove: function () {
-      // Implement medium difficulty logic
-      // For now, it will use the same logic as easy
-      this.computerEasyMove();
-    },
-
-    computerHardMove: function () {
-      // Implement hard difficulty logic
-      // For now, it will use the same logic as easy
-      this.computerEasyMove();
-    }
-  }
-
-  // Initialize the board
-  Board.initalize();
-
-  /***
-  Events
-  ***/
-
-  // Select the piece on click if it is the player's turn
-  $('.piece').on("click", function () {
-    var selected;
-    var isPlayersTurn = ($(this).parent().attr("class").split(' ')[0] == "player" + Board.playerTurn + "pieces");
-    if (isPlayersTurn && Board.playerTurn == 1) { // Ensure player can only move beige pieces
-      if (!Board.continuousjump && pieces[$(this).attr("id")].allowedtomove) {
-        if ($(this).hasClass('selected')) selected = true;
-        $('.piece').removeClass('selected');
-        if (!selected) {
-          $(this).addClass('selected');
-        }
-      } else {
-        let message = !Board.continuousjump ? "Jump exists for other pieces, that piece is not allowed to move" : "Continuous jump exists, you have to jump the same piece";
-        console.log(message);
-      }
-    }
-  });
-
-  $('.tile').on("click", function () {
-    if ($('.selected').length != 0) {
-      var tileID = $(this).attr("id").replace(/tile/, '');
-      var tile = tiles[tileID];
-      var piece = pieces[$('.selected').attr("id")];
-      var inRange = tile.inRange(piece);
-      if (inRange != 'wrong') {
-        if (inRange == 'jump') {
-          if (piece.opponentJump(tile)) {
-            var fromPosition = piece.position.slice(); // Store the original position
-            piece.move(tile);
-            updateMoveHistory(fromPosition, tile.position, true); // Update move history with jump
-            if (piece.canJumpAny()) {
-              piece.element.addClass('selected');
-              Board.continuousjump = true;
-            } else {
-              Board.changePlayerTurn();
+            if (max >= beta) {
+                break;
             }
-          }
-        } else if (inRange == 'regular' && !Board.jumpexist) {
-          if (!piece.canJumpAny()) {
-            var fromPosition = piece.position.slice(); // Store the original position
-            piece.move(tile);
-            updateMoveHistory(fromPosition, tile.position, false); // Update move history with regular move
-            Board.changePlayerTurn();
-          } else {
-            alert("You must jump when possible!");
-          }
-        }
-      }
-    }
-  });
-
-  // New buttons for copying and printing moves
-  $('#copyMovesBtn').on('click', function() {
-    var movesText = moveList.map(move => move.san).join(', '); // Collect moves in SAN format
-    navigator.clipboard.writeText(movesText).then(function() {
-      swal("Success", "Moves copied to clipboard!", "success");
-    }, function(err) {
-      swal("Error", "Failed to copy moves: " + err, "error");
-    });
-  });
-
-  $('#printMovesBtn').on('click', function() {
-    var movesText = moveList.map(move => move.san).join(', '); // Collect moves in SAN format
-    var printWindow = window.open('', '', 'height=400,width=600');
-    printWindow.document.write('<html><head><title>Checkers Moves</title></head><body>');
-    printWindow.document.write('<h1>Recorded Checkers Moves</h1>');
-    printWindow.document.write('<pre>' + movesText + '</pre>');
-    printWindow.document.write('</body></html>');
-    printWindow.document.close();
-    printWindow.print();
-  });
-
-Board.clear = function (callback) {
-  if (callback) {
-    localStorage.setItem('consoleMessage', callback.message);
-    $('#difficultyMessage').text(callback.message); // Update the HTML message
-  }
-  location.reload();
-};
-
-$(document).ready(function() {
-  var message = localStorage.getItem('consoleMessage');
-  if (message) {
-    console.log(message);
-    $('#difficultyMessage').text(message); // Update the HTML message on page load
-    localStorage.removeItem('consoleMessage');
-  }
-});
-
-  $('#easyModeBtn').on('click', function() {
-    Board.clear({ message: "EASY" });
-    Board.computerDifficulty = 'easy';
-  });
-
-  $('#mediumModeBtn').on('click', function() {
-    Board.clear({ message: "MEDIUM" });
-    Board.computerDifficulty = 'medium';
-  });
-
-  $('#hardModeBtn').on('click', function() {
-    Board.clear({ message: "HARD" });
-    Board.computerDifficulty = 'hard';
-  });
-
-  $('#extremeModeBtn').on('click', function() {
-    Board.clear({ message: "EXTREME" });
-    Board.computerDifficulty = 'extreme';
-  });
-
-  Board.computerEasyMove = function () {
-    let possibleMoves = [];
-    let jumpMoves = [];
-  
-    for (let piece of pieces) {
-      if (piece.player == 2 && piece.allowedtomove) {
-        for (let tile of tiles) {
-          let moveType = tile.inRange(piece);
-          if (moveType == 'regular' && this.isValidPlacetoMove(tile.position[0], tile.position[1])) {
-            possibleMoves.push({ piece: piece, tile: tile });
-          } else if (moveType == 'jump' && piece.canOpponentJump(tile.position)) {
-            jumpMoves.push({ piece: piece, tile: tile });
-          }
-        }
-      }
-    }
-  
-    if (jumpMoves.length > 0) {
-      // Prioritize jump moves
-      let move = jumpMoves[Math.floor(Math.random() * jumpMoves.length)];
-      setTimeout(() => {
-        const fromPosition = move.piece.position.slice(); // Store the original position
-        move.piece.opponentJump(move.tile);
-        move.piece.move(move.tile);
-        updateMoveHistory(fromPosition, move.tile.position, true); // Use 'X' for jump
-        if (move.piece.canJumpAny()) {
-          this.computerEasyMove(); // Continue jumping if possible
-        } else {
-          this.changePlayerTurn();
-        }
-      }, 2000); // 2000ms delay
-    } else if (possibleMoves.length > 0) {
-      let move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-      setTimeout(() => {
-        const fromPosition = move.piece.position.slice(); // Store the original position
-        move.piece.move(move.tile);
-        updateMoveHistory(fromPosition, move.tile.position, false); // Use '-' for regular move
-        this.changePlayerTurn();
-      }, 2000); // 2000ms delay
-    }
-  };
-  
-  Board.computerMediumMove = function () {
-    let possibleMoves = [];
-    let jumpMoves = [];
-    let safeMoves = [];
-  
-    for (let piece of pieces) {
-      if (piece.player == 2 && piece.allowedtomove) {
-        for (let tile of tiles) {
-          let moveType = tile.inRange(piece);
-          if (moveType == 'regular' && this.isValidPlacetoMove(tile.position[0], tile.position[1])) {
-            possibleMoves.push({ piece: piece, tile: tile });
-            // Check if the move is safe
-            if (!this.isMoveDangerous(piece, tile)) {
-              safeMoves.push({ piece: piece, tile: tile });
+            if (max > alpha) {
+                alpha = max;
             }
-          } else if (moveType == 'jump' && piece.canOpponentJump(tile.position)) {
-            jumpMoves.push({ piece: piece, tile: tile });
-          }
         }
-      }
     }
-  
-    if (jumpMoves.length > 0) {
-      // Prioritize jump moves
-      let move = jumpMoves[Math.floor(Math.random() * jumpMoves.length)];
-      setTimeout(() => {
-        move.piece.opponentJump(move.tile);
-        move.piece.move(move.tile);
-        updateMoveHistory("E" + move.piece.element.attr("id") + " X E" + move.tile.element.attr("id"));
-        if (move.piece.canJumpAny()) {
-          this.computerMediumMove(); // Continue jumping if possible
-        } else {
-          this.changePlayerTurn();
-        }
-      }, 3000); // 3000ms delay
-    } else if (safeMoves.length > 0) {
-      // Prioritize safe moves
-      let move = safeMoves[Math.floor(Math.random() * safeMoves.length)];
-      setTimeout(() => {
-        move.piece.move(move.tile);
-        updateMoveHistory("E" + move.piece.element.attr("id") + " - E" + move.tile.element.attr("id"));
-        this.changePlayerTurn();
-      }, 3000); // 3000ms delay
-    } else if (possibleMoves.length > 0) {
-      // If no safe moves, choose any possible move
-      let move = possibleMoves[Math.floor(Math.random() * possibleMoves.length)];
-      setTimeout(() => {
-        move.piece.move(move.tile);
-        updateMoveHistory("E" + move.piece.element.attr("id") + " - E" + move.tile.element.attr("id"));
-        this.changePlayerTurn();
-      }, 3000); // 3000ms delay
+    else {
+        //log("NO MORE MOVES FOR MAX: l=" + limit);
     }
-  };
 
-  Board.isMoveDangerous = function (piece, tile) {
-    let opponentPieces = pieces.filter(p => p.player == 1);
-    for (let opponentPiece of opponentPieces) {
-      if (opponentPiece.canOpponentJump(tile.position)) {
-        return true;
-      }
-    }
-    return false;
-  };
-  
-  Board.computerHardMove = function () {
-    const depth = 5; // Depth for the minimax algorithm
-  
-    // Check if we are in the opening phase
-    if (this.isOpeningPhase()) {
-      const openingMove = this.getOpeningMove();
-      if (openingMove) {
-        const { piece, tile } = openingMove;
-        setTimeout(() => {
-          piece.move(tile);
-          updateMoveHistory("E" + piece.element.attr("id") + " - E" + tile.element.attr("id"));
-          this.changePlayerTurn();
-        }, 2000); // 2000ms delay
-        return;
-      }
-    }
-  
-    const bestMove = this.minimax(Board, depth, true, -Infinity, Infinity, {});
-    if (bestMove) {
-      const { piece, tile } = bestMove;
-      setTimeout(() => {
-        piece.move(tile);
-        updateMoveHistory("E" + piece.element.attr("id") + " - E" + tile.element.attr("id"));
-        this.changePlayerTurn();
-      }, 2000); // 2000ms delay
-    }
-  };
-  
-  Board.isOpeningPhase = function () {
-    // Define the opening phase as the first 10 moves
-    return moveHistory.length < 10;
-  };
-  
-  Board.getOpeningMove = function () {
-    // Define some advanced opening moves
-    const openingBooks = [
-      // Example opening moves
-      [{ pieceId: 12, tileId: 20 }, { pieceId: 13, tileId: 21 }],
-      [{ pieceId: 14, tileId: 22 }, { pieceId: 15, tileId: 23 }],
-      // Add more opening moves as needed
-    ];
-  
-    for (const book of openingBooks) {
-      if (moveHistory.length < book.length) {
-        const move = book[moveHistory.length];
-        const piece = pieces[move.pieceId];
-        const tile = tiles[move.tileId];
-        if (piece && tile && piece.player === 2) {
-          return { piece, tile };
-        }
-      }
-    }
-    return null;
-  };
-  
-  Board.minimax = function (board, depth, isMaximizingPlayer, alpha, beta, transpositionTable) {
-    const boardKey = JSON.stringify(board.board);
-    if (transpositionTable[boardKey]) {
-      return transpositionTable[boardKey];
-    }
-  
-    if (depth === 0 || this.isGameOver(board)) {
-      return { score: this.evaluateBoard(board) };
-    }
-  
-    let bestMove = null;
-  
-    if (isMaximizingPlayer) {
-      let maxEval = -Infinity;
-      const moves = this.getAllPossibleMoves(board, 2); // Get all possible moves for the computer
-      this.orderMoves(moves); // Order moves to improve alpha-beta pruning
-      for (const move of moves) {
-        const newBoard = this.makeMove(board, move);
-        const evaluation = this.minimax(newBoard, depth - 1, false, alpha, beta, transpositionTable).score;
-        if (evaluation > maxEval) {
-          maxEval = evaluation;
-          bestMove = move;
-        }
-        alpha = Math.max(alpha, evaluation);
-        if (beta <= alpha) {
-          break;
-        }
-      }
-      transpositionTable[boardKey] = bestMove ? { ...bestMove, score: maxEval } : { score: maxEval };
-      return transpositionTable[boardKey];
-    } else {
-      let minEval = Infinity;
-      const moves = this.getAllPossibleMoves(board, 1); // Get all possible moves for the opponent
-      this.orderMoves(moves); // Order moves to improve alpha-beta pruning
-      for (const move of moves) {
-        const newBoard = this.makeMove(board, move);
-        const evaluation = this.minimax(newBoard, depth - 1, true, alpha, beta, transpositionTable).score;
-        if (evaluation < minEval) {
-          minEval = evaluation;
-          bestMove = move;
-        }
-        beta = Math.min(beta, evaluation);
-        if (beta <= alpha) {
-          break;
-        }
-      }
-      transpositionTable[boardKey] = bestMove ? { ...bestMove, score: minEval } : { score: minEval };
-      return transpositionTable[boardKey];
-    }
-  };
-  
-  Board.orderMoves = function (moves) {
-    // Order moves to prioritize captures and king moves
-    moves.sort((a, b) => {
-      if (a.tile.inRange(a.piece) === 'jump' && b.tile.inRange(b.piece) !== 'jump') {
-        return -1;
-      }
-      if (a.tile.inRange(a.piece) !== 'jump' && b.tile.inRange(b.piece) === 'jump') {
-        return 1;
-      }
-      if (a.piece.king && !b.piece.king) {
-        return -1;
-      }
-      if (!a.piece.king && b.piece.king) {
-        return 1;
-      }
-      return 0;
-    });
-  };
-  
-  Board.evaluateBoard = function (board) {
-    let score = 0;
-    for (let row of board.board) {
-      for (let cell of row) {
-        if (cell === 2) {
-          score += 5; // Computer piece
-        } else if (cell === 1) {
-          score -= 5; // Opponent piece
-        } else if (cell === 2.1) {
-          score += 10; // Computer king
-        } else if (cell === 1.1) {
-          score -= 10; // Opponent king
-        }
-      }
-    }
-    // Additional evaluation criteria
-    score += this.evaluatePieceSafety(board);
-    score += this.evaluateBoardControl(board);
-    return score;
-  };
-  
-  Board.evaluatePieceSafety = function (board) {
-    let safetyScore = 0;
-    for (let piece of pieces) {
-      if (piece.player === 2) {
-        if (this.isMoveDangerous(piece, { position: piece.position })) {
-          safetyScore -= 3; // Penalize unsafe pieces
-        } else {
-          safetyScore += 1; // Reward safe pieces
-        }
-      }
-    }
-    return safetyScore;
-  };
-  
-  Board.evaluateBoardControl = function (board) {
-    let controlScore = 0;
-    for (let row = 2; row <= 5; row++) {
-      for (let col = 2; col <= 5; col++) {
-        if (board.board[row][col] === 2) {
-          controlScore += 1; // Reward control of the center
-        } else if (board.board[row][col] === 1) {
-          controlScore -= 1; // Penalize opponent control of the center
-        }
-      }
-    }
-    return controlScore;
-  };
-  
-  Board.isGameOver = function (board) {
-    // Check if the game is over (either player has no pieces left or no valid moves)
-    const player1Pieces = pieces.filter(p => p.player === 1 && p.position.length !== 0);
-    const player2Pieces = pieces.filter(p => p.player === 2 && p.position.length !== 0);
-    return player1Pieces.length === 0 || player2Pieces.length === 0 || this.getAllPossibleMoves(board, 1).length === 0 || this.getAllPossibleMoves(board, 2).length === 0;
-  }
+    return max;
 
-  
-   // Extreme Mode AI 
-   Board.computerExtremeMove = function () {
-    if (this.playerTurn !== 2) return; // Ensure it's the computer's turn
-  
-    const depth = 20; // Further increased depth for the minimax algorithm
-  
-    // Check if we are in the opening phase
-    if (this.isOpeningPhase()) {
-      const openingMove = this.getOpeningMove();
-      if (openingMove) {
-        const { piece, tile } = openingMove;
-        setTimeout(() => {
-          piece.move(tile);
-          updateMoveHistory("E" + piece.element.attr("id") + " - E" + tile.element.attr("id"));
-          this.changePlayerTurn();
-        }, 2000); // 2000ms delay
-        return;
-      }
-    }
-  
-    // Implement midgame strategy
-    if (this.isMidgamePhase()) {
-      const midgameMove = this.getMidgameMove();
-      if (midgameMove) {
-        const { piece, tile } = midgameMove;
-        setTimeout(() => {
-          piece.move(tile);
-          updateMoveHistory("E" + piece.element.attr("id") + " - E" + tile.element.attr("id"));
-          this.changePlayerTurn();
-        }, 2000); // 2000ms delay
-        return;
-      }
-    }
-  
-    // Proceed with minimax if not in the opening or midgame phase
-    const bestMove = this.minimax(this.board, depth, true, -Infinity, Infinity);
-  
-    if (bestMove) {
-      const { piece, tile } = bestMove;
-      if (!this.isMoveLeadingToImmediateCapture(piece, tile) && !this.isMoveLeavingSquareOpenForCapture(piece, tile)) {
-        this.visualScanTiles(tile); // Add visual scanning effect
-        setTimeout(() => {
-          piece.move(tile);
-          updateMoveHistory("E" + piece.element.attr("id") + " - E" + tile.element.attr("id"));
-          this.changePlayerTurn();
-        }, 2000); // 2000ms delay
-      }
-    } else {
-      if (confirm("The game has reached a stalemate. Play again?")) {
-        this.clear();
-      }
-    }
-  };
+}
 
-  Board.isMidgamePhase = function () {
-    // Define the midgame phase as moves 10 to 30
-    return moveHistory.length >= 10 && moveHistory.length < 30;
-  };
-  
-  Board.getMidgameMove = function () {
-    // Implement midgame strategy focusing on center control and piece safety
-    let bestMove = null;
-    let bestScore = -Infinity;
-    for (let piece of pieces) {
-      if (piece.player == 2 && piece.allowedtomove) {
-        for (let tile of tiles) {
-          if (tile.inRange(piece) !== 'wrong' && this.isValidPlacetoMove(tile.position[0], tile.position[1])) {
-            const score = this.evaluateMove(piece, tile);
-            if (score > bestScore) {
-              bestScore = score;
-              bestMove = { piece, tile };
-            }
-          }
-        }
-      }
+function evaluate_position(x , y) {
+    if (x == 0 || x == 7 || y == 0 || y == 7){
+        return 5;
     }
-    return bestMove;
-  };
-  
-  Board.isMoveLeavingSquareOpenForCapture = function (piece, tile) {
-    // Simulate the move
-    const originalPosition = piece.position.slice();
-    const originalBoardValue = this.board[tile.position[0]][tile.position[1]];
-    this.board[originalPosition[0]][originalPosition[1]] = 0;
-    this.board[tile.position[0]][tile.position[1]] = piece.player;
-  
-    // Check if any opponent piece can capture the moved piece
-    let isCapturePossible = false;
-    let opponentPieces = pieces.filter(p => p.player == 1);
-    for (let opponentPiece of opponentPieces) {
-      const validMoves = this.getValidMoves(opponentPiece.position[0], opponentPiece.position[1]);
-      for (let move of validMoves) {
-        if (move.type === 'jump' && move.captures.some(capture => capture[0] === tile.position[0] && capture[1] === tile.position[1])) {
-          isCapturePossible = true;
-          break;
-        }
-      }
-      if (isCapturePossible) break;
+    else {
+        return 3;
     }
-  
-    // Revert the simulated move
-    this.board[originalPosition[0]][originalPosition[1]] = piece.player;
-    this.board[tile.position[0]][tile.position[1]] = originalBoardValue;
-  
-    return isCapturePossible;
-  };
-  
-  // Function to visually scan tiles
-  Board.visualScanTiles = function (tile) {
-    const adjacentPositions = [
-      [tile.position[0] - 1, tile.position[1] - 1], [tile.position[0] - 1, tile.position[1] + 1],
-      [tile.position[0] + 1, tile.position[1] - 1], [tile.position[0] + 1, tile.position[1] + 1]
-    ];
-  
-    for (let [adjX, adjY] of adjacentPositions) {
-      if (adjX >= 0 && adjX < 8 && adjY >= 0 && adjY < 8) {
-        const adjTile = tiles.find(t => t.position[0] === adjX && t.position[1] === adjY);
-        if (adjTile) {
-          adjTile.element.addClass('scanning');
-        }
-      }
-    }
-  
-    setTimeout(() => {
-      $('.tile').removeClass('scanning');
-    }, 1000); // Remove the scanning effect after 1 second
-  };
-  
-  Board.evaluateBoard = function (board) {
-    let score = 0;
-    for (let row of board) {
-        for (let cell of row) {
-            if (cell === 2) score += 5; // Computer piece
-            if (cell === 4) score += 10; // Computer king
-            if (cell === 1) score -= 5; // Opponent piece
-            if (cell === 3) score -= 10; // Opponent king
-        }
-    }
-    // Additional evaluation criteria
-    score += this.evaluatePieceSafety(board);
-    score += this.evaluateBoardControl(board);
-    score += this.evaluatePieceAdvancement(board); // New heuristic for piece advancement
-    score += this.evaluateKingPotential(board); // New heuristic for king potential
-    score += this.evaluateMobility(board); // New heuristic for mobility
-    score += this.evaluatePieceClustering(board); // New heuristic for piece clustering
-    score += this.evaluateEdgeSafety(board); // New heuristic for edge safety
-    score += this.evaluateKingMobility(board); // New heuristic for king mobility
-    score += this.evaluatePieceCentralization(board); // New heuristic for piece centralization
-    return score;
-};
+}
 
-// New heuristic for piece centralization
-Board.evaluatePieceCentralization = function (board) {
-  let centralizationScore = 0;
-  for (let x = 0; x < 8; x++) {
-      for (let y = 0; y < 8; y++) {
-          if (board[x][y] === 2 || board[x][y] === 4) { // Check for computer pieces
-              centralizationScore += (4 - Math.abs(4 - x)) + (4 - Math.abs(4 - y)); // Reward pieces closer to the center
-          } else if (board[x][y] === 1 || board[x][y] === 3) { // Check for opponent pieces
-              centralizationScore -= (4 - Math.abs(4 - x)) + (4 - Math.abs(4 - y)); // Penalize opponent pieces closer to the center
-          }
-      }
-  }
-  return centralizationScore;
-};
-  
-  Board.evaluatePieceAdvancement = function (board) {
-    let advancementScore = 0;
-    for (let x = 0; x < 8; x++) {
-      for (let y = 0; y < 8; y++) {
-        if (board[x][y] === 2) {
-          advancementScore += x; // Reward pieces closer to becoming kings
-        } else if (board[x][y] === 1) {
-          advancementScore -= (7 - x); // Penalize opponent pieces closer to becoming kings
-        }
-      }
-    }
-    return advancementScore;
-  };
-  
-  Board.evaluateKingPotential = function (board) {
-    let kingPotentialScore = 0;
-    for (let x = 0; x < 8; x++) {
-      for (let y = 0; y < 8; y++) {
-        if (board[x][y] === 2 && x === 6) {
-          kingPotentialScore += 5; // Reward pieces one step away from becoming kings
-        } else if (board[x][y] === 1 && x === 1) {
-          kingPotentialScore -= 5; // Penalize opponent pieces one step away from becoming kings
-        }
-      }
-    }
-    return kingPotentialScore;
-  };
-  
-  Board.evaluatePieceSafety = function (board) {
-    let safetyScore = 0;
-    for (let x = 0; x < 8; x++) {
-      for (let y = 0; y < 8; y++) {
-        if (board[x][y] === 2 || board[x][y] === 4) { // Check for computer pieces
-          if (this.isMoveDangerous({ position: [x, y] }, { position: [x, y] })) {
-            safetyScore -= 100; // Extremely high penalty for unsafe pieces
-          } else {
-            safetyScore += 50; // High reward for safe pieces
-          }
-        }
-      }
-    }
-    return safetyScore;
-  };
-  
-  Board.evaluateBoardControl = function (board) {
-    let controlScore = 0;
-    for (let row = 2; row <= 5; row++) {
-      for (let col = 2; col <= 5; col++) {
-        if (board[row][col] === 2) {
-          controlScore += 2; // Increased reward for control of the center
-        } else if (board[row][col] === 1) {
-          controlScore -= 2; // Increased penalty for opponent control of the center
-        }
-      }
-    }
-    return controlScore;
-  };
-  
-  Board.evaluateMobility = function (board) {
-    let mobilityScore = 0;
-    for (let x = 0; x < 8; x++) {
-      for (let y = 0; y < 8; y++) {
-        if (board[x][y] === 2 || board[x][y] === 4) { // Check for computer pieces
-          const moves = this.getValidMoves(x, y);
-          mobilityScore += moves.length; // Reward pieces with more valid moves
-        } else if (board[x][y] === 1 || board[x][y] === 3) { // Check for opponent pieces
-          const moves = this.getValidMoves(x, y);
-          mobilityScore -= moves.length; // Penalize opponent pieces with more valid moves
-        }
-      }
-    }
-    return mobilityScore;
-  };
-  
-  Board.evaluatePieceClustering = function (board) {
-    let clusteringScore = 0;
-    for (let x = 0; x < 8; x++) {
-      for (let y = 0; y < 8; y++) {
-        if (board[x][y] === 2 || board[x][y] === 4) { // Check for computer pieces
-          clusteringScore += this.getAdjacentPieces(board, x, y, 2).length; // Reward pieces that are clustered together
-        } else if (board[x][y] === 1 || board[x][y] === 3) { // Check for opponent pieces
-          clusteringScore -= this.getAdjacentPieces(board, x, y, 1).length; // Penalize opponent pieces that are clustered together
-        }
-      }
-    }
-    return clusteringScore;
-  };
-  
-  Board.evaluateEdgeSafety = function (board) {
-    let edgeSafetyScore = 0;
-    for (let x = 0; x < 8; x++) {
-      for (let y = 0; y < 8; y++) {
-        if ((x === 0 || x === 7 || y === 0 || y === 7) && (board[x][y] === 2 || board[x][y] === 4)) {
-          edgeSafetyScore += 1; // Reward pieces that are on the edge of the board
-        } else if ((x === 0 || x === 7 || y === 0 || y === 7) && (board[x][y] === 1 || board[x][y] === 3)) {
-          edgeSafetyScore -= 1; // Penalize opponent pieces that are on the edge of the board
-        }
-      }
-    }
-    return edgeSafetyScore;
-  };
-  
-  Board.evaluateKingMobility = function (board) {
-    let kingMobilityScore = 0;
-    for (let x = 0; x < 8; x++) {
-      for (let y = 0; y < 8; y++) {
-        if (board[x][y] === 4) { // Check for computer kings
-          const moves = this.getValidMoves(x, y);
-          kingMobilityScore += moves.length * 2; // Reward kings with more valid moves
-        } else if (board[x][y] === 3) { // Check for opponent kings
-          const moves = this.getValidMoves(x, y);
-          kingMobilityScore -= moves.length * 2; // Penalize opponent kings with more valid moves
-        }
-      }
-    }
-    return kingMobilityScore;
-  };
+function utility(target_board) {
+    var sum = 0;
+    var computer_pieces = 0;
+    var computer_kings = 0;
+    var human_pieces = 0;
+    var human_kings = 0;
+    var computer_pos_sum = 0;
+    var human_pos_sum = 0;
 
-  
-  // Function to visually scan tiles
-  Board.visualScanTiles = function (tile) {
-    const adjacentPositions = [
-      [tile.position[0] - 1, tile.position[1] - 1], [tile.position[0] - 1, tile.position[1] + 1],
-      [tile.position[0] + 1, tile.position[1] - 1], [tile.position[0] + 1, tile.position[1] + 1]
-    ];
-  
-    for (let [adjX, adjY] of adjacentPositions) {
-      if (adjX >= 0 && adjX < 8 && adjY >= 0 && adjY < 8) {
-        const adjTile = tiles.find(t => t.position[0] === adjX && t.position[1] === adjY);
-        if (adjTile) {
-          adjTile.element.addClass('scanning');
-        }
-      }
+    //log("************* UTILITY *****************")
+    for (var i=0; i<target_board.pieces.length; i++) {
+    	var piece = target_board.pieces[i];
+    	if (piece.row > -1) { // only count pieces still on the board
+	    	if (piece.state > 0) { // human
+	            human_pieces += 1;
+	            if (piece.state === 1.1){
+	                human_kings += 1;
+	            }
+	            var human_pos = evaluate_position(piece.col, piece.row);
+	            human_pos_sum += human_pos;
+	    	}
+	        else { // computer
+	            computer_pieces += 1;
+	            if (piece.state === -1.1){
+	                computer_kings += 1;
+	            }
+	            var computer_pos = evaluate_position(piece.col, piece.row);
+	            computer_pos_sum += computer_pos;
+	        }
+    	}
     }
-  
-    setTimeout(() => {
-      $('.tile').removeClass('scanning');
-    }, 1000); // Remove the scanning effect after 1 second
-  };
-  
-  Board.getAdjacentPieces = function (board, x, y, pieceType) {
-    const adjacentPositions = [
-      [x - 1, y - 1], [x - 1, y + 1],
-      [x + 1, y - 1], [x + 1, y + 1]
-    ];
-    return adjacentPositions.filter(([adjX, adjY]) => 
-      adjX >= 0 && adjX < 8 && adjY >= 0 && adjY < 8 && board[adjX][adjY] === pieceType
-    );
-  };
-  
-// Add CSS for scanning effect
-const style = document.createElement('style');
-style.innerHTML = `
-  .tile.scanning {
-    background-color: rgba(0, 255, 0, 0.5); /* Green overlay */
-    animation: scan 1s infinite;
-  }
 
-  @keyframes scan {
-    0% { background-color: rgba(0, 255, 0, 0.5); }
-    50% { background-color: rgba(0, 255, 0, 0.2); }
-    100% { background-color: rgba(0, 255, 0, 0.5); }
-  }
-`;
-document.head.appendChild(style);
-};
+    var piece_difference = computer_pieces - human_pieces;
+    var king_difference = computer_kings - human_kings;
+    if (human_pieces === 0){
+        human_pieces = 0.00001;
+    }
+    var avg_human_pos = human_pos_sum / human_pieces;
+    if (computer_pieces === 0) {
+        computer_pieces = 0.00001;
+    }
+    var avg_computer_pos = computer_pos_sum / computer_pieces;
+    var avg_pos_diff = avg_computer_pos - avg_human_pos;
+
+    var features = [piece_difference, king_difference, avg_pos_diff];
+    var weights = [100, 10, 1];
+
+    var board_utility = 0;
+
+    for (var f=0; f<features.length; f++){
+        var fw = features[f] * weights[f];
+        board_utility += fw;
+    }
+	
+    return board_utility;
+}
