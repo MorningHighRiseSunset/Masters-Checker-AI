@@ -1,33 +1,119 @@
+<!DOCTYPE html>
 <html>
-	<head>
-		<title>Extreme Checkers</title>
-		<!-- Google tag (gtag.js) -->
-		<script async src="https://www.googletagmanager.com/gtag/js?id=G-DEDLJH5XKD"></script>
-		<script>
-			window.dataLayer = window.dataLayer || [];
-			function gtag(){dataLayer.push(arguments);}
-			gtag('js', new Date());
-			gtag('config', 'G-DEDLJH5XKD');
-		</script>
-		<script src="https://d3js.org/d3.v4.min.js"></script>
-		<script src="checkers-engine.js"></script>
-	</head>
-	<body>
-		<button onclick="startGame({x: 0, y: 0}, 70, boardCanvas);">Start New Game</button>
-		<button id="btnReplay" style="display:none;" onclick="replayAll({x: 0, y: 0}, 70, boardCanvas)">View Replay</button><br/><br/>
-		<svg id="checkersBoard" width="560" height="560" style="float:left; margin-right: 50px;"></svg>
+<head>
+    <title>Extreme Checkers</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-DEDLJH5XKD"></script>
+    <script>
+        window.dataLayer = window.dataLayer || [];
+        function gtag(){dataLayer.push(arguments);}
+        gtag('js', new Date());
+        gtag('config', 'G-DEDLJH5XKD');
+    </script>
+    <script src="https://d3js.org/d3.v4.min.js"></script>
+    <script src="checkers-engine.js"></script>
+    <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+    <div class="game-container">
+        <div class="game-header">
+            <div class="button-container">
+                <button onclick="startGame({x: 0, y: 0}, 70, boardCanvas);">Start New Game</button>
+                <button id="btnReplay" style="display:none;" onclick="replayAll({x: 0, y: 0}, 70, boardCanvas)">View Replay</button>
+            </div>
+            <div id="divScoreboard"></div>
+        </div>
+        <div class="game-main">
+            <svg id="checkersBoard" width="560" height="560"></svg>
+        </div>
+    </div>
 
-		<div id="video-container" style="position: fixed; bottom: 10px; left: 10px; z-index: 1000; width: 320px; height: 240px;">
-			<iframe
-				src="https://brie.fi/ng/aged-display-28?audio=1&video=1&fs=0&invite=0&prefs=0&share=0&chat=1"
-				allow="camera; microphone; fullscreen; speaker; display-capture"
-				style="width: 100%; height: 100%; border: none; border-radius: 8px; box-shadow: 0 2px 10px rgba(0,0,0,0.2);">
-			</iframe>
-		</div>
+    <div class="hint-box" id="hintBox"></div>
 
-		<script type="text/javascript">
-			var boardCanvas = d3.select("#checkersBoard");
-			startGame({x: 0, y: 0}, 70, boardCanvas);
-		</script>
-	</body>
+    <div id="video-container">
+        <iframe
+            src="https://brie.fi/ng/aged-display-28?audio=1&video=1&fs=0&invite=0&prefs=0&share=0&chat=1"
+            allow="camera; microphone; fullscreen; speaker; display-capture">
+        </iframe>
+    </div>
+
+    <script>
+        var boardCanvas = d3.select("#checkersBoard");
+        startGame({x: 0, y: 0}, 70, boardCanvas);
+
+        const hints = {
+            beginner: [
+                "Always try to keep your back row filled - these are your safe spots!",
+                "Move pieces toward the center of the board when possible",
+                "Try to keep your pieces grouped together for protection",
+                "Don't rush to move all your pieces forward at once",
+                "Watch out for double jumps - your opponent might be setting a trap!",
+                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com",
+            ],
+            strategy: [
+                "Control the center squares to dominate the board",
+                "Create a 'bridge' with your pieces to protect each other",
+                "Force your opponent to make moves they don't want to make",
+                "Sometimes sacrificing a piece can lead to capturing multiple opponent pieces",
+                "Try to keep your pieces on the dark squares at the edges - they're safer there",
+                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com",
+            ],
+            kings: [
+                "Kings are most effective when used in the center of the board",
+                "Use kings to protect your regular pieces",
+                "A king in the middle is worth more than two pieces on the edges",
+                "Don't rush to make kings if it leaves your other pieces vulnerable",
+                "Use kings to trap opponent pieces against the edges",
+                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com",
+            ],
+            advanced: [
+                "Look for opportunities to create 'double threats'",
+                "Sometimes not jumping is strategically better, even though it's mandatory",
+                "Create blocking positions to limit your opponent's movement",
+                "Trade pieces only when it gives you a positional advantage",
+                "Keep track of your opponent's potential king conversions",
+                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com",
+            ],
+            endgame: [
+                "In the endgame, keep your pieces close together",
+                "With few pieces left, control the diagonal lines",
+                "Force exchanges when you're ahead in pieces",
+                "Keep your kings away from the edges in the endgame",
+                "Use the opposition principle - force your opponent to move first",
+                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com",
+            ]
+        };
+
+        function showRandomHint() {
+            const hintBox = document.getElementById('hintBox');
+            const categories = Object.keys(hints);
+            const randomCategory = categories[Math.floor(Math.random() * categories.length)];
+            const categoryHints = hints[randomCategory];
+            const randomHint = categoryHints[Math.floor(Math.random() * categoryHints.length)];
+            const formattedCategory = randomCategory.charAt(0).toUpperCase() + randomCategory.slice(1);
+            
+            hintBox.innerHTML = `
+                <div class="hint-category">${formattedCategory} Tip:</div>
+                ${randomHint}
+            `;
+            
+            hintBox.style.display = 'block';
+            hintBox.classList.remove('hiding');
+            
+            setTimeout(() => {
+                hintBox.classList.add('hiding');
+                setTimeout(() => {
+                    hintBox.style.display = 'none';
+                    hintBox.classList.remove('hiding');
+                }, 500);
+            }, 8000);
+        }
+
+        setTimeout(() => {
+            showRandomHint();
+            setInterval(showRandomHint, 15000);
+        }, 5000);
+    </script>
+</body>
 </html>
