@@ -569,172 +569,143 @@ function drawBoard(origin, cellWidth, boardCanvas) {
   var pieces = boardState.pieces;
 
   // Increase the size of the boardCanvas
-  var boardSize = cellWidth * 8; // Assuming an 8x8 board
+  var boardSize = cellWidth * 8;
   boardCanvas
-    .attr("width", boardSize)
-    .attr("height", boardSize)
-    .style("position", "absolute")
-    .style("left", "50%")
-    .style("top", "50%")
-    .style("transform", "translate(-50%, -50%)")
-    .style("border-radius", "10px") // Rounded corners
-    .style("box-shadow", "0 5px 15px rgba(0, 0, 0, 0.3)"); // Subtle shadow effect
+      .attr("width", boardSize)
+      .attr("height", boardSize)
+      .attr("class", "checker-board");
 
   // Define gradients for pieces
   var defs = boardCanvas.append("defs");
 
   var redGradient = defs
-    .append("radialGradient")
-    .attr("id", "redGradient")
-    .attr("cx", "50%")
-    .attr("cy", "50%")
-    .attr("r", "50%")
-    .attr("fx", "50%")
-    .attr("fy", "50%");
+      .append("radialGradient")
+      .attr("id", "redGradient")
+      .attr("cx", "50%")
+      .attr("cy", "50%")
+      .attr("r", "50%")
+      .attr("fx", "50%")
+      .attr("fy", "50%");
   redGradient
-    .append("stop")
-    .attr("offset", "0%")
-    .attr("style", "stop-color:#696969;stop-opacity:1"); // Dim gray
+      .append("stop")
+      .attr("offset", "0%")
+      .attr("style", "stop-color:#696969;stop-opacity:1");
   redGradient
-    .append("stop")
-    .attr("offset", "100%")
-    .attr("style", "stop-color:#000000;stop-opacity:1"); // Black
+      .append("stop")
+      .attr("offset", "100%")
+      .attr("style", "stop-color:#000000;stop-opacity:1");
 
   var blackGradient = defs
-    .append("radialGradient")
-    .attr("id", "blackGradient")
-    .attr("cx", "50%")
-    .attr("cy", "50%")
-    .attr("r", "50%")
-    .attr("fx", "50%")
-    .attr("fy", "50%");
+      .append("radialGradient")
+      .attr("id", "blackGradient")
+      .attr("cx", "50%")
+      .attr("cy", "50%")
+      .attr("r", "50%")
+      .attr("fx", "50%")
+      .attr("fy", "50%");
   blackGradient
-    .append("stop")
-    .attr("offset", "0%")
-    .attr("style", "stop-color:#FF6347;stop-opacity:1"); // Tomato
+      .append("stop")
+      .attr("offset", "0%")
+      .attr("style", "stop-color:#FF6347;stop-opacity:1");
   blackGradient
-    .append("stop")
-    .attr("offset", "100%")
-    .attr("style", "stop-color:#B22222;stop-opacity:1"); // Firebrick
+      .append("stop")
+      .attr("offset", "100%")
+      .attr("style", "stop-color:#B22222;stop-opacity:1");
 
   // Define drop shadow filter
   var filter = defs
-    .append("filter")
-    .attr("id", "dropShadow")
-    .attr("height", "150%");
+      .append("filter")
+      .attr("id", "dropShadow")
+      .attr("height", "150%");
   filter
-    .append("feGaussianBlur")
-    .attr("in", "SourceAlpha")
-    .attr("stdDeviation", 2); // Softer blur for a gentle shadow
+      .append("feGaussianBlur")
+      .attr("in", "SourceAlpha")
+      .attr("stdDeviation", 2);
   filter
-    .append("feOffset")
-    .attr("dx", 1)
-    .attr("dy", 1)
-    .attr("result", "offsetblur");
-  filter.append("feMerge").append("feMergeNode").attr("in", "offsetblur");
-  filter.append("feMerge").append("feMergeNode").attr("in", "SourceGraphic");
+      .append("feOffset")
+      .attr("dx", 1)
+      .attr("dy", 1)
+      .attr("result", "offsetblur");
+  filter.append("feMerge")
+      .append("feMergeNode")
+      .attr("in", "offsetblur");
+  filter.append("feMerge")
+      .append("feMergeNode")
+      .attr("in", "SourceGraphic");
 
-  // Draw cell rects with alternating colors
+  // Draw cells
   boardCanvas
-    .append("g")
-    .selectAll("rect")
-    .data(cells)
-    .enter()
-    .append("rect")
-    .attr("x", function (d) {
-      return mapCellToCoordinates(origin, cellWidth, d).x;
-    })
-    .attr("y", function (d) {
-      return mapCellToCoordinates(origin, cellWidth, d).y;
-    })
-    .attr("height", cellWidth)
-    .attr("width", cellWidth)
-    .style("fill", function (d, i) {
-      return (d.row + d.col) % 2 === 0 ? "#FFFFFF" : "#000000";
-    }) // White and black tiles
-    .style("stroke", "black")
-    .style("stroke-width", "1px")
-    .style("border-radius", "3px"); // Rounded corners for cells
+      .append("g")
+      .selectAll("rect")
+      .data(cells)
+      .enter()
+      .append("rect")
+      .attr("x", function(d) {
+          return mapCellToCoordinates(origin, cellWidth, d).x;
+      })
+      .attr("y", function(d) {
+          return mapCellToCoordinates(origin, cellWidth, d).y;
+      })
+      .attr("height", cellWidth)
+      .attr("width", cellWidth)
+      .style("fill", function(d) {
+          return (d.row + d.col) % 2 === 0 ? "#FFFFFF" : "#000000";
+      });
+
+  // Set up drag behavior
+  var dragBehavior = d3.drag()
+      .on("start", dragStarted)
+      .on("drag", dragged)
+      .on("end", function(d) {
+          dragEnded(origin, cellWidth, d3.select(this), d);
+      });
 
   // Draw pieces
-  var dragEndedDimensions = function (d) {
-    node = d3.select(this);
-    dragEnded(origin, cellWidth, node, d);
-  };
-
-  var drag = d3
-    .drag()
-    .on("start", dragStarted)
-    .on("drag", dragged)
-    .on("end", dragEndedDimensions);
-
   boardCanvas
-    .append("g")
-    .selectAll("circle")
-    .data(pieces)
-    .enter()
-    .append("circle")
-    .attr("r", cellWidth / 2.5)
-    .attr("cx", function (d) {
-      var x = mapCellToCoordinates(origin, cellWidth, d).x;
-      return x + cellWidth / 2;
-    })
-    .attr("cy", function (d) {
-      var y = mapCellToCoordinates(origin, cellWidth, d).y;
-      return y + cellWidth / 2;
-    })
-    .style("fill", function (d) {
-      return d.state == red ? "url(#redGradient)" : "url(#blackGradient)";
-    })
-    .style("filter", "url(#dropShadow)")
-    .call(drag);
+      .append("g")
+      .selectAll("circle")
+      .data(pieces)
+      .enter()
+      .append("circle")
+      .attr("r", cellWidth / 2.5)
+      .attr("cx", function(d) {
+          var x = mapCellToCoordinates(origin, cellWidth, d).x;
+          return x + cellWidth / 2;
+      })
+      .attr("cy", function(d) {
+          var y = mapCellToCoordinates(origin, cellWidth, d).y;
+          return y + cellWidth / 2;
+      })
+      .style("fill", function(d) {
+          return d.state == red ? "url(#redGradient)" : "url(#blackGradient)";
+      })
+      .style("filter", "url(#dropShadow)")
+      .call(dragBehavior);
 
-  // Draw scoreboard
+  // Create scoreboard
   d3.select("#divScoreboard").remove();
   d3.select("body")
-    .append("div")
-    .attr("id", "divScoreboard")
-    .style("font-size", "36px")
-    .style("background", "linear-gradient(to bottom, #f0f8ff, #4682b4)") // Light blue to steel blue gradient
-    .style("color", "#333")
-    .style("padding", "20px")
-    .style("border-radius", "10px")
-    .style("box-shadow", "0 4px 8px rgba(0, 0, 0, 0.2)")
-    .style("text-align", "center")
-    .style("width", "300px")
-    .style("margin", "20px auto")
-    .html("SCOREBOARD");
+      .append("div")
+      .attr("id", "divScoreboard")
+      .html("SCOREBOARD");
 
   d3.select("#divScoreboard")
-    .append("div")
-    .style("font-size", "24px")
-    .style("margin-top", "10px")
-    .attr("id", "winner");
+      .append("div")
+      .attr("id", "winner");
 
   d3.select("#divScoreboard")
-    .append("div")
-    .attr("id", "redScore")
-    .style("font-size", "18px")
-    .style("margin-top", "10px")
-    .style("color", "#fff")
-    .style("padding", "5px")
-    .style("border-radius", "5px")
-    .style("box-shadow", "0 2px 4px rgba(0, 0, 0, 0.1)")
-    .html("Blue: 12");
+      .append("div")
+      .attr("id", "redScore")
+      .html("Blue: 12");
 
   d3.select("#divScoreboard")
-    .append("div")
-    .attr("id", "blackScore")
-    .style("font-size", "18px")
-    .style("margin-top", "10px")
-    .style("color", "#fff")
-    .style("padding", "5px")
-    .style("border-radius", "5px")
-    .style("box-shadow", "0 2px 4px rgba(0, 0, 0, 0.1)")
-    .html("Gray: 12");
+      .append("div")
+      .attr("id", "blackScore")
+      .html("Gray: 12");
 
   return boardState;
 }
+
 
 function updateScoreboard() {
   var pieceCount = getPieceCount(currentBoard);
