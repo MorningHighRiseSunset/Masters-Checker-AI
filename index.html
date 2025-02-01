@@ -1,8 +1,9 @@
 <!DOCTYPE html>
-<html>
+<html lang="en">
 <head>
-    <title>Extreme Checkers</title>
+    <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Extreme Checkers</title>
     <!-- Google tag (gtag.js) -->
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-DEDLJH5XKD"></script>
     <script>
@@ -17,26 +18,30 @@
 </head>
 <body>
     <div class="game-container">
-        <div class="game-header">
-            <div class="button-container">
-				<button onclick="startGame({x: 0, y: 0}, 70, boardCanvas);">Start New Game</button>
-				<button id="btnReplay" style="display:none;" onclick="replayAll({x: 0, y: 0}, 70, boardCanvas)">View Replay</button>
-				<button onclick="window.open('https://masters-checkers-game.netlify.app/', '_blank')">Play Checkers Player v. Player</button>
-			</div>			
-            <div id="divScoreboard"></div>
+        <header class="game-header">
+            <h1>Checkers Player vs Computer</h1>
+        </header>
+        <div class="button-container">
+            <button onclick="startGame({x: 0, y: 0}, 70, boardCanvas);">Start New Game</button>
+            <button id="btnReplay" style="display:none;" onclick="replayAll({x: 0, y: 0}, 70, boardCanvas)">View Replay</button>
+            <button onclick="window.open('https://masters-checkers-game.netlify.app/', '_blank')">Player vs Player</button>
+            <button id="printMoves" onclick="printMoves()">Print Moves</button>
         </div>
-        <div class="game-main">
+        <div id="divScoreboard">
+            <!-- Scoreboard content here -->
+        </div>
+        <main class="game-main">
             <svg id="checkersBoard" width="560" height="560"></svg>
+        </main>
+
+        <div class="hint-box" id="hintBox"></div>
+
+        <div id="video-container">
+            <iframe src="https://brie.fi/ng/aged-display-28?audio=1&video=1&fs=0&invite=0&prefs=0&share=0&chat=1" 
+                    allow="camera; microphone; fullscreen; speaker; display-capture">
+            </iframe>
+            <button id="closeVideoBtn" onclick="closeVideo()">Close</button>
         </div>
-    </div>
-
-    <div class="hint-box" id="hintBox"></div>
-
-    <div id="video-container">
-        <iframe
-            src="https://brie.fi/ng/aged-display-28?audio=1&video=1&fs=0&invite=0&prefs=0&share=0&chat=1"
-            allow="camera; microphone; fullscreen; speaker; display-capture">
-        </iframe>
     </div>
 
     <script>
@@ -50,7 +55,7 @@
                 "Try to keep your pieces grouped together for protection",
                 "Don't rush to move all your pieces forward at once",
                 "Watch out for double jumps - your opponent might be setting a trap!",
-                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com",
+                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com"
             ],
             strategy: [
                 "Control the center squares to dominate the board",
@@ -58,7 +63,7 @@
                 "Force your opponent to make moves they don't want to make",
                 "Sometimes sacrificing a piece can lead to capturing multiple opponent pieces",
                 "Try to keep your pieces on the dark squares at the edges - they're safer there",
-                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com",
+                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com"
             ],
             kings: [
                 "Kings are most effective when used in the center of the board",
@@ -66,7 +71,7 @@
                 "A king in the middle is worth more than two pieces on the edges",
                 "Don't rush to make kings if it leaves your other pieces vulnerable",
                 "Use kings to trap opponent pieces against the edges",
-                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com",
+                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com"
             ],
             advanced: [
                 "Look for opportunities to create 'double threats'",
@@ -74,7 +79,7 @@
                 "Create blocking positions to limit your opponent's movement",
                 "Trade pieces only when it gives you a positional advantage",
                 "Keep track of your opponent's potential king conversions",
-                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com",
+                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com"
             ],
             endgame: [
                 "In the endgame, keep your pieces close together",
@@ -82,7 +87,7 @@
                 "Force exchanges when you're ahead in pieces",
                 "Keep your kings away from the edges in the endgame",
                 "Use the opposition principle - force your opponent to move first",
-                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com",
+                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com"
             ]
         };
 
@@ -93,7 +98,7 @@
             const categoryHints = hints[randomCategory];
             const randomHint = categoryHints[Math.floor(Math.random() * categoryHints.length)];
             const formattedCategory = randomCategory.charAt(0).toUpperCase() + randomCategory.slice(1);
-            
+
             hintBox.innerHTML = `
                 <div class="hint-category">${formattedCategory} Tip:</div>
                 ${randomHint}
@@ -115,6 +120,10 @@
             showRandomHint();
             setInterval(showRandomHint, 15000);
         }, 5000);
+
+        function closeVideo() {
+            document.getElementById('video-container').style.display = 'none';
+        }
     </script>
 </body>
 </html>
