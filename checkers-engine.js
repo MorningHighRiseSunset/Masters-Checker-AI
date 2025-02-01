@@ -74,35 +74,29 @@ function startGame(origin, cellWidth, boardCanvas) {
   currentBoard.ui = true;
   showBoardState();
 
-  // Add print button
-  d3.select("#printMoves").remove();
-  d3.select("body")
-    .append("button")
-    .attr("id", "printMoves")
-    .style("position", "absolute")
-    .style("left", "20px") // Position on the left side
-    .style("top", "35px") // Adjust top position to be under "Start New Game"
-    .text("Print Moves")
-    .on("click", function () {
-      var movesText = movePiece.moves
-        .map(
-          (move, index) =>
-            `Move ${index + 1}: (${move.from.row},${move.from.col}) to (${move.to.row},${move.to.col})`,
-        )
-        .join("<br>");
+  // Ensure the button is part of button-container
+  d3.select("#printMoves") // Ensure this button exists within button-container
+      .on("click", function () {
+          var movesText = movePiece.moves
+              .map(
+                  (move, index) =>
+                  `Move ${index + 1}: (${move.from.row},${move.from.col}) to (${move.to.row},${move.to.col})`,
+              )
+              .join("<br>");
 
-      // Create a new window for printing
-      var printWindow = window.open("", "", "height=400,width=600");
-      printWindow.document.write(
-        "<html><head><title>Move History</title></head><body>",
-      );
-      printWindow.document.write("<h1>Move History</h1>");
-      printWindow.document.write(movesText);
-      printWindow.document.write("</body></html>");
-      printWindow.document.close();
-      printWindow.print();
-    });
+          // Create a new window for printing
+          var printWindow = window.open("", "", "height=400,width=600");
+          printWindow.document.write(
+              "<html><head><title>Move History</title></head><body>",
+          );
+          printWindow.document.write("<h1>Move History</h1>");
+          printWindow.document.write(movesText);
+          printWindow.document.write("</body></html>");
+          printWindow.document.close();
+          printWindow.print();
+      });
 }
+
 
 function replayAll(origin, cellWidth, boardCanvas) {
   var allMoves = movePiece.moves;
