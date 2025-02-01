@@ -165,7 +165,7 @@ button:hover {
 @media (max-width: 768px) {
     .game-container {
         flex-direction: column;
-        align-items: stretch;
+        align-items: center;
         padding: 10px;
     }
 
@@ -173,14 +173,21 @@ button:hover {
         order: 1;
     }
 
+    #divScoreboard {
+        order: 2; /* Ensures the scoreboard comes right after the game board */
+        margin-top: 20px;
+        width: 100%;
+        box-sizing: border-box;
+    }
+
     .button-container {
-        order: 2;
+        order: 3; /* Place the buttons after the scoreboard */
         flex-direction: column;
         width: 100%;
     }
 
     #video-container {
-        order: 3;
+        order: 4; /* Ensure the video container is at the end */
         position: static;
         margin-top: 20px;
         width: 100%;
@@ -194,11 +201,8 @@ button:hover {
         height: auto;
         min-height: 200px;
     }
-
-    #divScoreboard {
-        order: 4;
-        margin-top: 20px;
-        width: 100%;
-        box-sizing: border-box;
-    }
 }
+
+
+
+
