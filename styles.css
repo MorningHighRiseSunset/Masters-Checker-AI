@@ -37,12 +37,8 @@ body {
 }
 
 #checkersBoard {
-    width: 100%;
-    max-width: 560px;
+    max-width: 100%;
     height: auto;
-    background: rgba(255, 255, 255, 0.1);
-    border-radius: 10px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
 .button-container {
@@ -168,42 +164,41 @@ button:hover {
 
 @media (max-width: 768px) {
     .game-container {
+        flex-direction: column;
+        align-items: stretch;
         padding: 10px;
     }
 
+    .game-main {
+        order: 1;
+    }
+
     .button-container {
-        width: 100%;
-        display: flex;
-        flex-wrap: wrap;
-        gap: 10px;
-        justify-content: center;
-    }
-    
-    button {
-        width: 100%;
-        margin-bottom: 10px;
-    }
-    
-    #video-container {
-        position: fixed;
-        bottom: 20px;
-        right: 20px;
-        z-index: 500; /* Ensure it's visible */
-        display: flex;
-        /* Align and display corrections */
+        order: 2;
         flex-direction: column;
-        align-items: center;
-        background: rgba(0, 0, 0, 0.7);
-        border-radius: 10px;
-        overflow: hidden;
+        width: 100%;
     }
 
-    #video-container.no-display { display: none; } /* Ensure it toggling display is correct */
+    #video-container {
+        order: 3;
+        position: static;
+        margin-top: 20px;
+        width: 100%;
+        display: flex;
+        box-sizing: border-box;
+        height: auto;
+    }
 
-    .hint-box {
-        top: auto;
-        bottom: 200px;
-        right: 50%;
-        transform: translateX(50%);
+    #video-container iframe {
+        width: 100%;
+        height: auto;
+        min-height: 200px;
+    }
+
+    #divScoreboard {
+        order: 4;
+        margin-top: 20px;
+        width: 100%;
+        box-sizing: border-box;
     }
 }
