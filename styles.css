@@ -3,77 +3,53 @@ body {
     background: linear-gradient(135deg, #1a1a2e, #16213e);
     color: #fff;
     margin: 0;
-    padding: 20px;
+    padding: 0;
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
     min-height: 100vh;
+    box-sizing: border-box;
 }
 
 .game-container {
-    margin-right: 340px;
     max-width: 800px;
-    margin: 0 auto;
+    width: 100%;
     display: flex;
     flex-direction: column;
     align-items: center;
-    gap: 20px;
+    box-sizing: border-box;
+    padding: 20px;
+    background: rgba(255, 255, 255, 0.05);
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    border-radius: 10px;
+    gap: 15px;
 }
 
 .game-header {
+    text-align: center;
     width: 100%;
-    display: flex;
-    flex-direction: column;
-    align-items: center;
-    gap: 20px;
 }
 
 .game-main {
-    position: relative;
     width: 100%;
+    display: flex;
+    justify-content: center;
 }
 
 #checkersBoard {
-    max-width: 100%;
+    width: 100%;
+    max-width: 560px;
     height: auto;
     background: rgba(255, 255, 255, 0.1);
     border-radius: 10px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
 }
 
-.checker-board {
-    border-radius: 10px;
-    box-shadow: 0 5px 15px rgba(0, 0, 0, 0.3);
-}
-
-.board-cell {
-    stroke: black;
-    stroke-width: 1px;
-    border-radius: 3px;
-}
-
-.board-cell-white { fill: #FFFFFF; }
-.board-cell-black { fill: #000000; }
-
-.piece-red {
-    fill: url(#redGradient);
-    filter: url(#dropShadow);
-    cursor: pointer;
-    transition: transform 0.2s;
-}
-
-.piece-black {
-    fill: url(#blackGradient);
-    filter: url(#dropShadow);
-    cursor: pointer;
-    transition: transform 0.2s;
-}
-
-.piece-red:hover, .piece-black:hover {
-    transform: scale(1.1);
-}
-
 .button-container {
+    width: 100%;
     display: flex;
-    gap: 10px;
     flex-wrap: wrap;
+    gap: 10px;
     justify-content: center;
 }
 
@@ -123,48 +99,45 @@ button:hover {
 }
 
 #divScoreboard {
-    font-size: 24px;
+    font-size: 20px;
+    width: 500px;
     background: rgba(255, 255, 255, 0.1);
-    padding: 15px 30px;
+    padding: 15px;
     border-radius: 10px;
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
     text-align: center;
-    margin: 10px 0;
-    width: 100%;
-    max-width: 300px;
-}
-
-#winner {
-    font-size: 24px;
-    margin-top: 10px;
-    color: #4CAF50;
-    font-weight: bold;
-}
-
-#redScore, #blackScore {
-    font-size: 18px;
-    margin-top: 10px;
-    color: #fff;
-    padding: 5px;
-    border-radius: 5px;
-    background: rgba(0, 0, 0, 0.2);
+    max-width: none;
 }
 
 #video-container {
     position: fixed;
+    bottom: 20px;
     right: 20px;
-    top: 50%;
-    transform: translateY(-50%);
-    z-index: 1000;
+    z-index: 500;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    background: rgba(0, 0, 0, 0.7);
+    border-radius: 10px;
+    overflow: hidden;
 }
-
 
 #video-container iframe {
     width: 300px;
-    height: 225px;
+    height: 200px;
     border: none;
     border-radius: 8px;
     box-shadow: 0 2px 10px rgba(0, 0, 0, 0.2);
+}
+
+#closeVideoBtn {
+    background-color: rgba(0, 0, 0, 0.5);
+    color: white;
+    border: none;
+    cursor: pointer;
+    padding: 5px 10px;
+    border-radius: 5px;
+    margin-top: 5px;
 }
 
 @keyframes slideIn {
@@ -193,44 +166,44 @@ button:hover {
     animation: slideOut 0.5s ease-in;
 }
 
-.dragging {
-    cursor: grabbing;
-    opacity: 0.8;
-}
-
 @media (max-width: 768px) {
     .game-container {
         padding: 10px;
     }
 
-    #checkersBoard {
-        width: 100%;
-        max-width: 400px;
-    }
-    
     .button-container {
-        flex-direction: column;
+        width: 100%;
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        justify-content: center;
     }
     
     button {
-        margin: 5px 0;
+        width: 100%;
+        margin-bottom: 10px;
     }
     
     #video-container {
-        width: 240px;
-        height: 180px;
+        position: fixed;
+        bottom: 20px;
+        right: 20px;
+        z-index: 500; /* Ensure it's visible */
+        display: flex;
+        /* Align and display corrections */
+        flex-direction: column;
+        align-items: center;
+        background: rgba(0, 0, 0, 0.7);
+        border-radius: 10px;
+        overflow: hidden;
     }
+
+    #video-container.no-display { display: none; } /* Ensure it toggling display is correct */
 
     .hint-box {
         top: auto;
-        bottom: 270px;
+        bottom: 200px;
         right: 50%;
         transform: translateX(50%);
-        max-width: 85%;
-    }
-
-    #divScoreboard {
-        width: 90%;
-        font-size: 20px;
     }
 }
