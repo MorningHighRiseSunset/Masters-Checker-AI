@@ -4,7 +4,7 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Extreme Checkers</title>
-    <!-- Google tag (gtag.js) -->
+    <link rel="stylesheet" href="styles.css">
     <script async src="https://www.googletagmanager.com/gtag/js?id=G-DEDLJH5XKD"></script>
     <script>
         window.dataLayer = window.dataLayer || [];
@@ -14,7 +14,6 @@
     </script>
     <script src="https://d3js.org/d3.v4.min.js"></script>
     <script src="checkers-engine.js"></script>
-    <link rel="stylesheet" href="styles.css">
 </head>
 <body>
     <div class="game-container">
@@ -24,22 +23,26 @@
         <main class="game-main">
             <svg id="checkersBoard" viewBox="0 0 560 560" preserveAspectRatio="xMinYMin meet"></svg>
         </main>
-        <div id="divScoreboard">
-            <!-- Scoreboard content here -->
-        </div>
         <div class="button-container">
             <button onclick="startGame({x: 0, y: 0}, 70, boardCanvas);">Start New Game</button>
             <button id="btnReplay" style="display:none;" onclick="replayAll({x: 0, y: 0}, 70, boardCanvas)">View Replay</button>
             <button onclick="window.open('https://masters-checkers-game.netlify.app/', '_blank')">Player vs Player</button>
             <button id="printMoves" onclick="printMoves()">Print Moves</button>
         </div>
-        <div class="hint-box" id="hintBox"></div>
-    </div>    
+        <!-- Score moved here -->
+        <div>
+            <h3><center>SCOREBOARD</center></h3>
+            <div id="redScore">Black: 12</div>
+            <div id="blackScore">Red: 12</div>
+            <div id="winner"></div>
+        </div>
+    </div>
+    <div class="hint-box" id="hintBox"></div>
 
     <script>
         var boardCanvas = d3.select("#checkersBoard");
         startGame({x: 0, y: 0}, 70, boardCanvas);
-    
+
         const hints = {
             beginner: [
                 "Always try to keep your back row filled - these are your safe spots!",
@@ -82,7 +85,7 @@
                 "Found a bug or have suggestions? Contact: maurice13stu@gmail.com"
             ]
         };
-    
+
         function showRandomHint() {
             const hintBox = document.getElementById('hintBox');
             const categories = Object.keys(hints);
@@ -90,7 +93,7 @@
             const categoryHints = hints[randomCategory];
             const randomHint = categoryHints[Math.floor(Math.random() * categoryHints.length)];
             const formattedCategory = randomCategory.charAt(0).toUpperCase() + randomCategory.slice(1);
-    
+
             hintBox.innerHTML = `
                 <div class="hint-category">${formattedCategory} Tip:</div>
                 ${randomHint}
@@ -107,15 +110,11 @@
                 }, 500);
             }, 8000);
         }
-    
+
         setTimeout(() => {
             showRandomHint();
-            setInterval(showRandomHint, 30000); // Update interval to 30000 ms (30 seconds)
+            setInterval(showRandomHint, 30000);
         }, 5000);
-    
-        function closeVideo() {
-            document.getElementById('video-container').style.display = 'none';
-        }
-    </script>    
+    </script>
 </body>
 </html>
