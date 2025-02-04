@@ -676,35 +676,14 @@ function drawBoard(origin, cellWidth, boardCanvas) {
       .style("filter", "url(#dropShadow)")
       .call(dragBehavior);
 
-  // Create scoreboard
-  d3.select("#divScoreboard").remove();
-  d3.select("body")
-      .append("div")
-      .attr("id", "divScoreboard")
-      .html("SCOREBOARD");
-
-  d3.select("#divScoreboard")
-      .append("div")
-      .attr("id", "winner");
-
-  d3.select("#divScoreboard")
-      .append("div")
-      .attr("id", "redScore")
-      .html("Blue: 12");
-
-  d3.select("#divScoreboard")
-      .append("div")
-      .attr("id", "blackScore")
-      .html("Gray: 12");
-
   return boardState;
 }
 
 
 function updateScoreboard() {
   var pieceCount = getPieceCount(currentBoard);
-  var redLabel = "Red: " + pieceCount.red;
-  var blackLabel = "Black: " + pieceCount.black;
+  var redLabel = "Blue: " + pieceCount.red;
+  var blackLabel = "Gray: " + pieceCount.black;
 
   d3.select("#redScore").html(redLabel);
   d3.select("#blackScore").html(blackLabel);
@@ -712,13 +691,13 @@ function updateScoreboard() {
   var winner = getWinner(currentBoard);
   var winnerLabel = "";
   if (winner === player) {
-    winnerLabel = "Red Wins!!";
+      winnerLabel = "Blue Wins!!";
   } else if (winner === computer) {
-    winnerLabel = "Black Wins!!";
+      winnerLabel = "Gray Wins!!";
   }
 
   if (winner != 0) {
-    d3.select("#btnReplay").style("display", "inline");
+      d3.select("#btnReplay").style("display", "inline");
   }
 
   d3.select("#winner").html(winnerLabel);
