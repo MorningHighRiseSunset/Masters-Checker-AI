@@ -17,7 +17,6 @@ body {
     display: flex;
     flex-direction: column;
     align-items: center;
-    box-sizing: border-box;
     padding: 20px;
     background: rgba(255, 255, 255, 0.05);
     box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
@@ -39,6 +38,17 @@ body {
 #checkersBoard {
     max-width: 100%;
     height: auto;
+}
+
+#divScoreboard {
+    width: 100%;
+    background: rgba(255, 255, 255, 0.1);
+    padding: 15px;
+    border-radius: 10px;
+    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+    text-align: center;
+    box-sizing: border-box;
+    margin-top: 15px;
 }
 
 .button-container {
@@ -68,7 +78,7 @@ button:hover {
 
 .hint-box {
     position: fixed;
-    top: 20px;
+    bottom: 20px;
     right: 20px;
     background: rgba(31, 41, 55, 0.95);
     color: #fff;
@@ -92,17 +102,6 @@ button:hover {
     font-size: 14px;
     text-transform: uppercase;
     letter-spacing: 1px;
-}
-
-#divScoreboard {
-    font-size: 20px;
-    width: 500px;
-    background: rgba(255, 255, 255, 0.1);
-    padding: 15px;
-    border-radius: 10px;
-    box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
-    text-align: center;
-    max-width: none;
 }
 
 #video-container {
@@ -164,9 +163,16 @@ button:hover {
 
 @media (max-width: 768px) {
     .game-container {
+        max-width: 800px;
+        width: 100%;
+        display: flex;
         flex-direction: column;
         align-items: center;
-        padding: 10px;
+        padding: 20px;
+        background: rgba(255, 255, 255, 0.05);
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        border-radius: 10px;
+        gap: 15px;
     }
 
     .game-main {
@@ -174,25 +180,27 @@ button:hover {
     }
 
     #divScoreboard {
-        order: 2; /* Ensures the scoreboard comes right after the game board */
-        margin-top: 20px;
         width: 100%;
+        background: rgba(255, 255, 255, 0.1);
+        padding: 15px;
+        border-radius: 10px;
+        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.2);
+        text-align: center;
         box-sizing: border-box;
+        margin-top: 15px;
     }
 
     .button-container {
-        order: 3; /* Place the buttons after the scoreboard */
+        order: 3;
         flex-direction: column;
         width: 100%;
     }
 
     #video-container {
-        order: 4; /* Ensure the video container is at the end */
+        order: 4;
         position: static;
         margin-top: 20px;
         width: 100%;
-        display: flex;
-        box-sizing: border-box;
         height: auto;
     }
 
@@ -202,7 +210,3 @@ button:hover {
         min-height: 200px;
     }
 }
-
-
-
-
