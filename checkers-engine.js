@@ -950,18 +950,41 @@ function select_random_move(moves) {
   return selected_move;
 }
 
+function isMoveVulnerable(simulatedBoard, move) {
+  // Simulate current move
+  var boardAfterMove = copy_board(simulatedBoard);
+  var pieceIndex = getPieceIndex(boardAfterMove.pieces, move.from.row, move.from.col);
+  var piece = boardAfterMove.pieces[pieceIndex];
+  boardAfterMove = movePiece(boardAfterMove, piece, move.from, move.to, 1);
+
+  // Get opponent's available moves
+  var opponentMoves = get_available_moves(player, boardAfterMove);
+
+  // Check if any move can capture the moved piece
+  return opponentMoves.some(opMove => {
+    return opMove.move_type === "jump" && opMove.to.row === move.to.row && opMove.to.col === move.to.col;
+  });
+}
+
 function alpha_beta_search(calc_board, limit) {
   var alpha = NEG_INFINITY;
   var beta = INFINITY;
+  var best_moves = [];
 
-  //get available moves for computer
+  // Get available moves for computer
   var available_moves = get_available_moves(computer, calc_board);
 
-  //get max value for each available move
+  // Filter out moves that make the piece vulnerable
+  var safe_moves = available_moves.filter(move => !isMoveVulnerable(calc_board, move));
+
+  if (safe_moves.length > 0) {
+    available_moves = safe_moves; // Consider only safe moves if they exist
+  }
+
+  // Get max value for each available move
   var max = max_value(calc_board, available_moves, limit, alpha, beta);
 
-  //find all moves that have max-value
-  var best_moves = [];
+  // Find all moves that have max-value
   var max_move = null;
   for (var i = 0; i < available_moves.length; i++) {
     var next_move = available_moves[i];
@@ -971,7 +994,7 @@ function alpha_beta_search(calc_board, limit) {
     }
   }
 
-  //randomize selection, if multiple moves have same max-value
+  // Randomize selection if multiple moves have the same max-value
   if (best_moves.length > 1) {
     max_move = select_random_move(best_moves);
   }
@@ -999,42 +1022,40 @@ function computerMove() {
     selected_move = alpha_beta_search(simulated_board, 8);
   }
 
-  console.log(
-    "best move: " +
-      selected_move.from.col +
-      ":" +
-      selected_move.from.row +
-      " to " +
-      selected_move.to.col +
-      ":" +
-      selected_move.to.row,
-  );
+  // Display "AI is thinking..." message
+  d3.select("#aiStatus").html("Computer AI is thinking...");
 
-  // Make computer's move
-  var pieceIndex = getPieceIndex(
-    currentBoard.pieces,
-    selected_move.from.row,
-    selected_move.from.col,
-  );
-  var piece = currentBoard.pieces[pieceIndex];
-  currentBoard = movePiece(
-    currentBoard,
-    piece,
-    selected_move.from,
-    selected_move.to,
-    1,
-  );
-  moveCircle(selected_move.to, 1);
-  showBoardState();
+  // Wait 5 seconds before executing the move
+  setTimeout(() => {
+    // Clear the AI status message
+    d3.select("#aiStatus").html("");
 
-  var winner = getWinner(currentBoard);
-  if (winner != 0) {
-    currentBoard.gameOver = true;
-  } else {
-    // Set turn back to human
-    currentBoard.turn = player;
-    currentBoard.delay = 0;
-  }
+    // Make computer's move
+    var pieceIndex = getPieceIndex(
+      currentBoard.pieces,
+      selected_move.from.row,
+      selected_move.from.col,
+    );
+    var piece = currentBoard.pieces[pieceIndex];
+    currentBoard = movePiece(
+      currentBoard,
+      piece,
+      selected_move.from,
+      selected_move.to,
+      1,
+    );
+    moveCircle(selected_move.to, 1);
+    showBoardState();
+    
+    var winner = getWinner(currentBoard);
+    if (winner != 0) {
+      currentBoard.gameOver = true;
+    } else {
+      // Set turn back to human
+      currentBoard.turn = player;
+      currentBoard.delay = 0;
+    }
+  }, 5000); // 5000 milliseconds = 5 seconds
 }
 
 function jump_available(available_moves) {
