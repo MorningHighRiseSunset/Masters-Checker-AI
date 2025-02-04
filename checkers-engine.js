@@ -682,8 +682,8 @@ function drawBoard(origin, cellWidth, boardCanvas) {
 
 function updateScoreboard() {
   var pieceCount = getPieceCount(currentBoard);
-  var redLabel = "Blue: " + pieceCount.red;
-  var blackLabel = "Gray: " + pieceCount.black;
+  var redLabel = "Black: " + pieceCount.red;
+  var blackLabel = "Red: " + pieceCount.black;
 
   d3.select("#redScore").html(redLabel);
   d3.select("#blackScore").html(blackLabel);
@@ -691,9 +691,9 @@ function updateScoreboard() {
   var winner = getWinner(currentBoard);
   var winnerLabel = "";
   if (winner === player) {
-      winnerLabel = "Blue Wins!!";
+      winnerLabel = "Black Wins!!";
   } else if (winner === computer) {
-      winnerLabel = "Gray Wins!!";
+      winnerLabel = "Red Wins!!";
   }
 
   if (winner != 0) {
