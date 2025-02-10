@@ -718,7 +718,7 @@ function drawBoard(origin, cellWidth, boardCanvas) {
             dragEnded(origin, cellWidth, d3.select(this), d);
         });
 
-    // Draw pieces
+    // Draw pieces and add click event for position display
     boardCanvas
         .append("g")
         .selectAll("circle")
@@ -735,10 +735,19 @@ function drawBoard(origin, cellWidth, boardCanvas) {
             return y + cellWidth / 2;
         })
         .style("fill", function(d) {
-            return d.state == red ? "url(#redGradient)" : "url(#blackGradient)";
+            return d.state == red || d.state == redKing ? "url(#redGradient)" : "url(#blackGradient)";
         })
         .style("filter", "url(#dropShadow)")
-        .call(dragBehavior);
+        .call(dragBehavior)
+        .on("click", function(d) {
+            // Determine piece color
+            let pieceColor = (d.state == red || d.state == redKing) ? "Red" : "Black";
+            // Display position in the console
+            console.log(`${pieceColor} Checker at Position: (${d.row}, ${d.col})`);
+
+            // Optionally, display this info in a DOM element
+            // d3.select("#positionDisplay").html(`${pieceColor} Checker at Position: (${d.row}, ${d.col})`);
+        });
 
     return boardState;
 }
@@ -1060,13 +1069,42 @@ function isMoveVulnerable(simulatedBoard, move) {
     let piece = boardAfterMove.pieces[pieceIndex];
     boardAfterMove = movePiece(boardAfterMove, piece, move.from, move.to, 1);
 
-    // Get opponent's available moves
+    // Get opponent's available moves and check if any can capture the piece
     let opponentMoves = get_available_moves(player, boardAfterMove);
-
-    // Determine if there is any move that can capture the moved piece
-    return opponentMoves.some(opMove => (
+    return opponentMoves.some(opMove => 
         opMove.move_type === "jump" && opMove.to.row === move.to.row && opMove.to.col === move.to.col
-    ));
+    );
+}
+
+function isSacrificeForDoubleJump(simulatedBoard, move) {
+    // Simulate the current move
+    let boardAfterMove = copy_board(simulatedBoard);
+    let pieceIndex = getPieceIndex(boardAfterMove.pieces, move.from.row, move.from.col);
+    let piece = boardAfterMove.pieces[pieceIndex];
+    boardAfterMove = movePiece(boardAfterMove, piece, move.from, move.to, 1);
+
+    // Get opponent's available moves assuming they make the best single jump
+    let opponentMoves = get_available_moves(player, boardAfterMove);
+    let doubleJumpExists = false;
+
+    opponentMoves.forEach(opponentMove => {
+        if (opponentMove.move_type === 'jump') {
+            // Apply jump move
+            let boardAfterJump = copy_board(boardAfterMove);
+            let index = getPieceIndex(boardAfterJump.pieces, opponentMove.from.row, opponentMove.from.col);
+            let opponentPiece = boardAfterJump.pieces[index];
+            boardAfterJump = movePiece(boardAfterJump, opponentPiece, opponentMove.from, opponentMove.to, 1);
+
+            // Check for subsequent double jump opportunity
+            let subsequentMoves = get_available_moves(player, boardAfterJump);
+            if (subsequentMoves.some(nextMove => nextMove.move_type === 'jump')) {
+                doubleJumpExists = true;
+            }
+        }
+    });
+
+    // Only return true if we setup a double jump scenario for us
+    return !doubleJumpExists;
 }
 
 function alpha_beta_search(calc_board, limit) {
@@ -1076,30 +1114,26 @@ function alpha_beta_search(calc_board, limit) {
 
     let all_moves = get_available_moves(computer, calc_board);
 
-    // Apply comprehensive safety checks including double jump vulnerability
-    let safe_moves = all_moves.filter(move =>
-        !isMoveVulnerable(calc_board, move) &&
-        !isMoveDoubleJumpVulnerable(calc_board, move)
-    );
+    // Strictly filter for moves that are either completely safe or set up a double jump for the AI
+    let defensive_moves = all_moves.filter(move => {
+        return !isMoveVulnerable(calc_board, move) || isSacrificeForDoubleJump(calc_board, move);
+    });
 
-    let available_moves = safe_moves.length ? safe_moves : all_moves;
+    // Ensure we conduct the analysis only with safe or favorable moves
+    if (defensive_moves.length === 0) {
+        return select_random_move(all_moves); // Fallback if no options are left
+    }
 
-    let max = max_value(calc_board, available_moves, limit, alpha, beta);
+    let max = max_value(calc_board, defensive_moves, limit, alpha, beta);
 
-    let max_move = null;
-    for (let i = 0; i < available_moves.length; i++) {
-        let next_move = available_moves[i];
+    for (let i = 0; i < defensive_moves.length; i++) {
+        let next_move = defensive_moves[i];
         if (next_move.score === max) {
-            max_move = next_move;
             best_moves.push(next_move);
         }
     }
 
-    if (best_moves.length > 1) {
-        max_move = select_random_move(best_moves);
-    }
-
-    return max_move;
+    return best_moves.length > 0 ? select_random_move(best_moves) : select_random_move(defensive_moves);
 }
 
 function isMoveSafe(simulatedBoard, move) {
@@ -1227,8 +1261,8 @@ function min_value(calc_board, human_moves, limit, alpha, beta) {
 
             //compare to min and update, if necessary
             if (max_score < min) {
-                min = max_score;
-            }
+                  min = max_score;
+              }
             human_moves[i].score = min;
             if (min <= alpha) {
                 break;
