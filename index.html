@@ -40,82 +40,111 @@
     </div>
     <div class="hint-box" id="hintBox"></div>
 
+    <style>
+        /* Add CSS to position the hint box at the bottom right */
+        .hint-box {
+            position: fixed;
+            bottom: 20px;
+            right: 20px;
+            background-color: rgba(0, 0, 0, 0.8);
+            color: white;
+            padding: 10px;
+            border-radius: 5px;
+            display: none; /* Hidden by default */
+            transition: all 0.5s ease;
+        }
+        .hint-box.hiding {
+            display: none;
+        }
+    </style>
+    
     <script>
         var boardCanvas = d3.select("#checkersBoard");
         startGame({x: 0, y: 0}, 70, boardCanvas);
-
+    
         const hints = {
             beginner: [
                 "Always try to keep your back row filled - these are your safe spots!",
                 "Move pieces toward the center of the board when possible",
                 "Try to keep your pieces grouped together for protection",
                 "Don't rush to move all your pieces forward at once",
-                "Watch out for double jumps - your opponent might be setting a trap!",
-                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com"
+                "Watch out for double jumps - your opponent might be setting a trap!"
             ],
             strategy: [
                 "Control the center squares to dominate the board",
                 "Create a 'bridge' with your pieces to protect each other",
                 "Force your opponent to make moves they don't want to make",
                 "Sometimes sacrificing a piece can lead to capturing multiple opponent pieces",
-                "Try to keep your pieces on the dark squares at the edges - they're safer there",
-                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com"
+                "Try to keep your pieces on the dark squares at the edges - they're safer there"
             ],
             kings: [
                 "Kings are most effective when used in the center of the board",
                 "Use kings to protect your regular pieces",
                 "A king in the middle is worth more than two pieces on the edges",
                 "Don't rush to make kings if it leaves your other pieces vulnerable",
-                "Use kings to trap opponent pieces against the edges",
-                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com"
+                "Use kings to trap opponent pieces against the edges"
             ],
             advanced: [
                 "Look for opportunities to create 'double threats'",
                 "Sometimes not jumping is strategically better, even though it's mandatory",
                 "Create blocking positions to limit your opponent's movement",
                 "Trade pieces only when it gives you a positional advantage",
-                "Keep track of your opponent's potential king conversions",
-                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com"
+                "Keep track of your opponent's potential king conversions"
             ],
             endgame: [
                 "In the endgame, keep your pieces close together",
                 "With few pieces left, control the diagonal lines",
                 "Force exchanges when you're ahead in pieces",
                 "Keep your kings away from the edges in the endgame",
-                "Use the opposition principle - force your opponent to move first",
-                "Found a bug or have suggestions? Contact: maurice13stu@gmail.com"
+                "Use the opposition principle - force your opponent to move first"
             ]
         };
-
-        function showRandomHint() {
+    
+        function showHint(hint, duration, callback) {
             const hintBox = document.getElementById('hintBox');
-            const categories = Object.keys(hints);
-            const randomCategory = categories[Math.floor(Math.random() * categories.length)];
-            const categoryHints = hints[randomCategory];
-            const randomHint = categoryHints[Math.floor(Math.random() * categoryHints.length)];
-            const formattedCategory = randomCategory.charAt(0).toUpperCase() + randomCategory.slice(1);
-
-            hintBox.innerHTML = `
-                <div class="hint-category">${formattedCategory} Tip:</div>
-                ${randomHint}
-            `;
-            
+            hintBox.innerHTML = `<div class="hint-category">Tip:</div> ${hint}`;
             hintBox.style.display = 'block';
             hintBox.classList.remove('hiding');
-            
+    
             setTimeout(() => {
                 hintBox.classList.add('hiding');
                 setTimeout(() => {
                     hintBox.style.display = 'none';
                     hintBox.classList.remove('hiding');
+                    if (callback) callback();
                 }, 500);
-            }, 8000);
+            }, duration);
         }
-
-        setTimeout(() => {
-            showRandomHint();
-            setInterval(showRandomHint, 30000);
-        }, 5000);
-    </script>
+    
+        function showInitialHint() {
+            const initialHint = "Found a bug or have suggestions? Contact: maurice13stu@gmail.com";
+            showHint(initialHint, 8000, startCyclingHints);
+        }
+    
+        function startCyclingHints() {
+            showAndCycleHints();
+        }
+    
+        function showAndCycleHints() {
+            const categories = Object.keys(hints);
+    
+            function showNextHint(index) {
+                if (index >= categories.length) {
+                    index = 0; // Restart the cycle
+                }
+                
+                const categoryHints = hints[categories[index]];
+                const randomHint = categoryHints[Math.floor(Math.random() * categoryHints.length)];
+                showHint(randomHint, 4000, () => {
+                    setTimeout(() => showNextHint(index + 1), 4000); // 4-second pause before the next hint
+                });
+            }
+    
+            showNextHint(0); // Start from the first category
+        }
+    
+        setTimeout(showInitialHint, 5000);
+    </script>       
+    
 </body>
 </html>
