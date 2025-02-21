@@ -70,14 +70,16 @@ function mapCellToCoordinates(origin, width, cell) {
 function mapCoordinatesToCell(origin, width, cells, x, y) {
     var numSquares = 8;
     var boardLength = numSquares * width;
-    if (x > origin.x + boardLength) return null;
-    if (y > origin.y + boardLength) return null;
-    var col = Math.ceil((x - origin.x) / width) - 1;
-    var row = Math.ceil((y - origin.y) / width) - 1;
-    var index = row * numSquares + col;
-    var cell = cells[index];
 
-    return cell;
+    if (x > origin.x + boardLength || x < origin.x) return null;
+    if (y > origin.y + boardLength || y < origin.y) return null;
+
+    var col = Math.floor((x - origin.x) / width);
+    var row = Math.floor((y - origin.y) / width);
+    if (col < 0 || col >= numSquares || row < 0 || row >= numSquares) return null;
+
+    var index = row * numSquares + col;
+    return cells[index];
 }
 
 function startGame(origin, cellWidth, boardCanvas) {
@@ -233,8 +235,10 @@ function undo(numBack) {
 }
 
 function movePiece(boardState, piece, fromCell, toCell, moveNum) {
+    const playerOrAI = boardState.turn === player ? "Player" : "AI"; // Define at the start
+
     if (boardState.ui) {
-        if (movePiece.moves == null) {
+        if (!movePiece.moves) {
             movePiece.moves = [];
         }
         movePiece.moves.push({
@@ -252,10 +256,13 @@ function movePiece(boardState, piece, fromCell, toCell, moveNum) {
                 row: toCell.row
             },
         });
+
+        // Log the initial move
+        console.log(`${playerOrAI} moved from (${fromCell.row},${fromCell.col}) to (${toCell.row},${toCell.col})`);
     }
 
     // Get jumped piece
-    var jumpedPiece = getJumpedPiece(
+    const jumpedPiece = getJumpedPiece(
         boardState.cells,
         boardState.pieces,
         fromCell,
@@ -263,16 +270,16 @@ function movePiece(boardState, piece, fromCell, toCell, moveNum) {
     );
 
     // Update states
-    var fromIndex = getCellIndex(fromCell.row, fromCell.col);
-    var toIndex = getCellIndex(toCell.row, toCell.col);
-    if ((toCell.row === 0 || toCell.row === 8) && Math.abs(piece.state) === 1) {
-        boardState.cells[toIndex].state = piece.state * 1.1;
+    const fromIndex = getCellIndex(fromCell.row, fromCell.col);
+    const toIndex = getCellIndex(toCell.row, toCell.col);
+    if ((toCell.row === 0 || toCell.row === 7) && Math.abs(piece.state) === 1) {
+        boardState.cells[toIndex].state = piece.state * 1.1; // Promote to King
     } else {
         boardState.cells[toIndex].state = piece.state;
     }
     boardState.cells[fromIndex].state = empty;
     if ((toCell.row === 0 || toCell.row === 7) && Math.abs(piece.state) === 1) {
-        piece.state = piece.state * 1.1;
+        piece.state = piece.state * 1.1; // Promote to King
     }
     piece.col = toCell.col;
     piece.row = toCell.row;
@@ -282,16 +289,16 @@ function movePiece(boardState, piece, fromCell, toCell, moveNum) {
     }
 
     if (jumpedPiece != null) {
-        var jumpedIndex = getPieceIndex(
+        const jumpedIndex = getPieceIndex(
             boardState.pieces,
             jumpedPiece.row,
             jumpedPiece.col,
         );
-        var originialJumpPieceState = jumpedPiece.state;
+        const originalJumpPieceState = jumpedPiece.state;
         jumpedPiece.state = 0;
 
-        var cellIndex = getCellIndex(jumpedPiece.row, jumpedPiece.col);
-        var jumpedCell = boardState.cells[cellIndex];
+        const cellIndex = getCellIndex(jumpedPiece.row, jumpedPiece.col);
+        const jumpedCell = boardState.cells[cellIndex];
         jumpedCell.state = empty;
         boardState.pieces[jumpedIndex].lastCol = boardState.pieces[jumpedIndex].col;
         boardState.pieces[jumpedIndex].lastRow = boardState.pieces[jumpedIndex].row;
@@ -306,7 +313,7 @@ function movePiece(boardState, piece, fromCell, toCell, moveNum) {
                 piece: {
                     col: jumpedPiece.col,
                     row: jumpedPiece.row,
-                    state: originialJumpPieceState,
+                    state: originalJumpPieceState,
                 },
                 from: {
                     col: jumpedCell.col,
@@ -317,17 +324,20 @@ function movePiece(boardState, piece, fromCell, toCell, moveNum) {
                     row: -1
                 },
             });
+
+            // Log the capture move
+            console.log(`${playerOrAI} captured a piece at (${jumpedCell.row},${jumpedCell.col})`);
         }
 
         // Another jump?
-        var more_moves = get_available_piece_moves(
+        const more_moves = get_available_piece_moves(
             boardState,
             piece,
             boardState.turn,
         );
-        var another_move = null;
-        for (var i = 0; i < more_moves.length; i++) {
-            more_move = more_moves[i];
+        let another_move = null;
+        for (let i = 0; i < more_moves.length; i++) {
+            const more_move = more_moves[i];
             if (more_move.move_type === "jump") {
                 another_move = more_move;
                 break;
@@ -366,7 +376,6 @@ function isMoveDoubleJumpVulnerable(simulatedBoard, move) {
             let movedPiece = boardAfterFirstJump.pieces[index];
             boardAfterFirstJump = movePiece(boardAfterFirstJump, movedPiece, firstMove.from, firstMove.to, 1);
 
-            // Check for subsequent jumps indicating a double jump opportunity
             let opponentSecondMoveOptions = get_available_moves(player, boardAfterFirstJump);
             if (jump_available(opponentSecondMoveOptions)) {
                 return true;
@@ -463,7 +472,8 @@ function hideCircle(cell, moveNum) {
     currentBoard.delay = moveNum * 600 + 500;
     d3.selectAll("circle").each(function(d, i) {
         if (d.state === 0 && d.lastRow === cell.row && d.lastCol === cell.col) {
-            console.log("Hide col=" + cell.col + ", row=" + cell.row);
+            // Remove or comment out the debug log statement
+            // console.log("Hide col=" + cell.col + ", row=" + cell.row);
             d3.select(this)
                 .transition()
                 .delay(600 * moveNum)
@@ -569,52 +579,42 @@ function getJumpedPiece(cells, pieces, from, to) {
 
 function isMoveLegal(cells, pieces, piece, from, to) {
     if (to.col < 0 || to.row < 0 || to.col > 7 || to.row > 7) {
-        //console.log("ILLEGAL MOVE: piece going off board");
+        // Move is off the board
         return false;
     }
     var distance = {
         x: to.col - from.col,
         y: to.row - from.row
     };
-    if (distance.x == 0 || distance.y == 0) {
-        //console.log("ILLEGAL MOVE: horizontal or vertical move");
+    if (distance.x === 0 || distance.y === 0) {
+        // Can't move horizontally or vertically
         return false;
     }
-    if (abs(distance.x) != abs(distance.y)) {
-        //console.log("ILLEGAL MOVE: non-diagonal move");
+    if (Math.abs(distance.x) !== Math.abs(distance.y)) {
+        // Move must be diagonal
         return false;
     }
-    if (abs(distance.x) > 2) {
-        //console.log("ILLEGAL MOVE: more than two diagonals");
+    if (Math.abs(distance.x) > 2) {
+        // Can't move more than two squares diagonally
         return false;
     }
-    /* TODO: handle double jump
-      if ((abs(distance.x) == 1) && double_jump) {
-          return false;
-      }
-      */
-    if (to.state != empty) {
-        //console.log("ILLEGAL MOVE: cell is not empty");
+    if (to.state !== empty) {
+        // Target cell isn't empty
         return false;
     }
-    if (abs(distance.x) == 2) {
+    if (Math.abs(distance.x) === 2) {
         var jumpedPiece = getJumpedPiece(cells, pieces, from, to);
-        if (jumpedPiece == null) {
-            //console.log("ILLEGAL MOVE: no piece to jump");
+        if (!jumpedPiece) {
+            // No piece to jump
             return false;
         }
-        var pieceState = integ(piece.state);
-        var jumpedState = integ(jumpedPiece.state);
-        if (pieceState != -jumpedState) {
-            //console.log("ILLEGAL MOVE: can't jump own piece");
+        if (Math.round(piece.state) !== -Math.round(jumpedPiece.state)) {
+            // Can't jump own piece
             return false;
         }
     }
-    if (
-        integ(piece.state) === piece.state &&
-        sign(piece.state) != sign(distance.y)
-    ) {
-        //console.log("ILLEGAL MOVE: wrong direction");
+    if (Math.round(piece.state) === piece.state && Math.sign(piece.state) !== Math.sign(distance.y)) {
+        // Wrong move direction for non-king piece
         return false;
     }
 
@@ -1107,35 +1107,6 @@ function isSacrificeForDoubleJump(simulatedBoard, move) {
     return !doubleJumpExists;
 }
 
-function alpha_beta_search(calc_board, limit) {
-    let alpha = NEG_INFINITY;
-    let beta = INFINITY;
-    let best_moves = [];
-
-    let all_moves = get_available_moves(computer, calc_board);
-
-    // Strictly filter for moves that are either completely safe or set up a double jump for the AI
-    let defensive_moves = all_moves.filter(move => {
-        return !isMoveVulnerable(calc_board, move) || isSacrificeForDoubleJump(calc_board, move);
-    });
-
-    // Ensure we conduct the analysis only with safe or favorable moves
-    if (defensive_moves.length === 0) {
-        return select_random_move(all_moves); // Fallback if no options are left
-    }
-
-    let max = max_value(calc_board, defensive_moves, limit, alpha, beta);
-
-    for (let i = 0; i < defensive_moves.length; i++) {
-        let next_move = defensive_moves[i];
-        if (next_move.score === max) {
-            best_moves.push(next_move);
-        }
-    }
-
-    return best_moves.length > 0 ? select_random_move(best_moves) : select_random_move(defensive_moves);
-}
-
 function isMoveSafe(simulatedBoard, move) {
     let boardAfterMove = copy_board(simulatedBoard);
     let pieceIndex = getPieceIndex(boardAfterMove.pieces, move.from.row, move.from.col);
@@ -1153,59 +1124,95 @@ function isMoveSafe(simulatedBoard, move) {
 }
 
 function computerMove() {
-    // Copy board into simulated board
     var simulated_board = copy_board(currentBoard);
-
-    // Get all available moves
     var available_moves = get_available_moves(computer, simulated_board);
 
-    var selected_move;
-    // If jumps are available, only consider jump moves
-    if (jump_available(available_moves)) {
-        var jump_moves = available_moves.filter(
-            (move) => move.move_type === "jump",
-        );
-        // Use AI to select best jump move
-        selected_move = alpha_beta_search(simulated_board, 8, jump_moves);
-    } else {
-        // No jumps available, use normal AI selection
-        selected_move = alpha_beta_search(simulated_board, 8);
+    if (available_moves.length === 0) {
+        console.warn('No available moves for the computer.');
+        return;
     }
 
-    // Display "AI is thinking..." message
-    d3.select("#aiStatus").html("Computer AI is thinking...");
+    // Prioritize jump moves or filter for safe moves otherwise
+    var jump_moves = available_moves.filter(move => move.move_type === 'jump');
+    
+    if (jump_moves.length > 0) {
+        move_to_execute = alpha_beta_search(simulated_board, 10, jump_moves) || select_random_move(jump_moves);
+    } else {
+        available_moves = filterSafeMoves(available_moves, simulated_board);
+        move_to_execute = alpha_beta_search(simulated_board, 10, available_moves) || select_random_move(available_moves);
+    }
 
-    // Wait 5 seconds before executing the move
-    setTimeout(() => {
-        // Clear the AI status message
-        d3.select("#aiStatus").html("");
+    executeMove(move_to_execute);
+}
 
-        // Make computer's move
-        var pieceIndex = getPieceIndex(
-            currentBoard.pieces,
-            selected_move.from.row,
-            selected_move.from.col,
-        );
-        var piece = currentBoard.pieces[pieceIndex];
-        currentBoard = movePiece(
-            currentBoard,
-            piece,
-            selected_move.from,
-            selected_move.to,
-            1,
-        );
-        moveCircle(selected_move.to, 1);
+function executeMove(move) {
+    if (!move) {
+        console.error('No valid move selected.');
+        return;
+    }
+
+    const pieceIndex = getPieceIndex(currentBoard.pieces, move.from.row, move.from.col);
+    if (pieceIndex !== -1) {
+        const piece = currentBoard.pieces[pieceIndex];
+        currentBoard = movePiece(currentBoard, piece, move.from, move.to, 1);
+        moveCircle(move.to, 1);
         showBoardState();
-
-        var winner = getWinner(currentBoard);
-        if (winner != 0) {
+        
+        // Check for game over
+        const winner = getWinner(currentBoard);
+        if (winner !== 0) {
             currentBoard.gameOver = true;
         } else {
-            // Set turn back to human
             currentBoard.turn = player;
             currentBoard.delay = 0;
         }
-    }, 5000); // 5000 milliseconds = 5 seconds
+
+    } else {
+        console.error('Invalid piece index for the selected move.');
+    }
+}
+
+function filterSafeMoves(moves, board) {
+    let safeMoves = moves.filter(move => {
+        let simulated_board = copy_board(board);
+        let pieceIndex = getPieceIndex(simulated_board.pieces, move.from.row, move.from.col);
+        let piece = simulated_board.pieces[pieceIndex];
+
+        simulated_board = movePiece(simulated_board, piece, move.from, move.to, 1);
+        let opponentMoves = get_available_moves(player, simulated_board);
+
+        return !opponentMoves.some(opMove => 
+            opMove.move_type === 'jump' || 
+            createsDoubleJump(simulated_board, opMove)
+        );
+    });
+
+    // If no moves are marked safe, permit slightly risky moves to ensure a move is made
+    if (safeMoves.length === 0) {
+        safeMoves = moves.filter(move => {
+            let simulated_board = copy_board(board);
+            let pieceIndex = getPieceIndex(simulated_board.pieces, move.from.row, move.from.col);
+            let piece = simulated_board.pieces[pieceIndex];
+    
+            simulated_board = movePiece(simulated_board, piece, move.from, move.to, 1);
+            let opponentMoves = get_available_moves(player, simulated_board);
+
+            // Consider moves with minimal risk (i.e., no immediate loss but potential double jumps may exist)
+            return !opponentMoves.some(opMove => opMove.move_type === 'jump');
+        });
+    }
+
+    return safeMoves;
+}
+
+function createsDoubleJump(board, move) {
+    let simulatedBoard = copy_board(board);
+    let pieceIndex = getPieceIndex(simulatedBoard.pieces, move.from.row, move.from.col);
+    let piece = simulatedBoard.pieces[pieceIndex];
+    simulatedBoard = movePiece(simulatedBoard, piece, move.from, move.to, 1);
+
+    let nextAvailableMoves = get_available_moves(player, simulatedBoard);
+    return nextAvailableMoves.some(nextMove => nextMove.move_type === 'jump');
 }
 
 function jump_available(available_moves) {
@@ -1221,115 +1228,71 @@ function jump_available(available_moves) {
     return jump;
 }
 
+function alpha_beta_search(calc_board, limit, moves) {
+    let alpha = NEG_INFINITY;
+    let beta = INFINITY;
+    let best_move;
+    let max_score = NEG_INFINITY;
+
+    for (let move of moves) {
+        let simulated_board = copy_board(calc_board);
+        let pieceIndex = getPieceIndex(simulated_board.pieces, move.from.row, move.from.col);
+        let piece = simulated_board.pieces[pieceIndex];
+        simulated_board = movePiece(simulated_board, piece, move.from, move.to, 1);
+
+        let score = min_value(simulated_board, get_available_moves(player, simulated_board), limit - 1, alpha, beta);
+
+        if (score > max_score) {
+            max_score = score;
+            best_move = move;
+        }
+        alpha = Math.max(alpha, score);
+    }
+
+    return best_move;
+}
+
 function min_value(calc_board, human_moves, limit, alpha, beta) {
-    if (limit <= 0 && !jump_available(human_moves)) {
+    if (limit <= 0 || human_moves.length === 0) {
         return utility(calc_board);
     }
-    var min = INFINITY;
+    let min = INFINITY;
 
-    //for each move, get min
-    if (human_moves.length > 0) {
-        for (var i = 0; i < human_moves.length; i++) {
-            simulated_board = copy_board(calc_board);
+    for (let move of human_moves) {
+        let simulated_board = copy_board(calc_board);
+        let pieceIndex = getPieceIndex(simulated_board.pieces, move.from.row, move.from.col);
+        let piece = simulated_board.pieces[pieceIndex];
+        simulated_board = movePiece(simulated_board, piece, move.from, move.to, 1);
 
-            //move human piece
-            var human_move = human_moves[i];
-            var pieceIndex = getPieceIndex(
-                simulated_board.pieces,
-                human_move.from.row,
-                human_move.from.col,
-            );
-            var piece = simulated_board.pieces[pieceIndex];
-            simulated_board = movePiece(
-                simulated_board,
-                piece,
-                human_move.from,
-                human_move.to,
-            );
+        let computer_moves = get_available_moves(computer, simulated_board);
+        let score = max_value(simulated_board, computer_moves, limit - 1, alpha, beta);
 
-            //get available moves for computer
-            var computer_moves = get_available_moves(computer, simulated_board);
-
-            //get max value for this move
-            var max_score = max_value(
-                simulated_board,
-                computer_moves,
-                limit - 1,
-                alpha,
-                beta,
-            );
-
-            //compare to min and update, if necessary
-            if (max_score < min) {
-                  min = max_score;
-              }
-            human_moves[i].score = min;
-            if (min <= alpha) {
-                break;
-            }
-            if (min < beta) {
-                beta = min;
-            }
-        }
-    } else {
-        //log("NO MORE MOVES FOR MIN: l=" + limit);
+        min = Math.min(min, score);
+        if (min <= alpha) return min;
+        beta = Math.min(beta, min);
     }
 
     return min;
 }
 
 function max_value(calc_board, computer_moves, limit, alpha, beta) {
-    if (limit <= 0 && !jump_available(computer_moves)) {
+    if (limit <= 0 || computer_moves.length === 0) {
         return utility(calc_board);
     }
-    var max = NEG_INFINITY;
+    let max = NEG_INFINITY;
 
-    //for each move, get max
-    if (computer_moves.length > 0) {
-        for (var i = 0; i < computer_moves.length; i++) {
-            simulated_board = copy_board(calc_board);
+    for (let move of computer_moves) {
+        let simulated_board = copy_board(calc_board);
+        let pieceIndex = getPieceIndex(simulated_board.pieces, move.from.row, move.from.col);
+        let piece = simulated_board.pieces[pieceIndex];
+        simulated_board = movePiece(simulated_board, piece, move.from, move.to, 1);
 
-            //move computer piece
-            var computer_move = computer_moves[i];
-            var pieceIndex = getPieceIndex(
-                simulated_board.pieces,
-                computer_move.from.row,
-                computer_move.from.col,
-            );
-            var piece = simulated_board.pieces[pieceIndex];
-            simulated_board = movePiece(
-                simulated_board,
-                piece,
-                computer_move.from,
-                computer_move.to,
-            );
+        let human_moves = get_available_moves(player, simulated_board);
+        let score = min_value(simulated_board, human_moves, limit - 1, alpha, beta);
 
-            //get available moves for human
-            var human_moves = get_available_moves(player, simulated_board);
-
-            //get min value for this move
-            var min_score = min_value(
-                simulated_board,
-                human_moves,
-                limit - 1,
-                alpha,
-                beta,
-            );
-            computer_moves[i].score = min_score;
-
-            //compare to min and update, if necessary
-            if (min_score > max) {
-                max = min_score;
-            }
-            if (max >= beta) {
-                break;
-            }
-            if (max > alpha) {
-                alpha = max;
-            }
-        }
-    } else {
-        //log("NO MORE MOVES FOR MAX: l=" + limit);
+        max = Math.max(max, score);
+        if (max >= beta) return max;
+        alpha = Math.max(alpha, max);
     }
 
     return max;
@@ -1352,30 +1315,28 @@ function utility(target_board) {
     let human_pos_sum = 0;
     let potential_captures = 0;
     let vulnerability_penalty = 0;
+    let protection_bonus = 0;
 
-    for (var i = 0; i < target_board.pieces.length; i++) {
-        var piece = target_board.pieces[i];
+    for (var piece of target_board.pieces) {
         if (piece.row > -1) {
             if (piece.state > 0) {
                 human_pieces += 1;
-                if (piece.state === redKing) {
-                    human_kings += 1;
-                }
+                if (piece.state === redKing) human_kings += 1;
                 human_pos_sum += evaluate_position(piece.col, piece.row);
             } else {
                 computer_pieces += 1;
-                if (piece.state === blackKing) {
-                    computer_kings += 1;
-                }
+                if (piece.state === blackKing) computer_kings += 1;
                 computer_pos_sum += evaluate_position(piece.col, piece.row);
 
-                // Check vulnerability to prioritize safety
+                // Check vulnerability
                 let opponentMoves = get_available_moves(player, target_board);
                 let isVulnerable = opponentMoves.some(move =>
                     move.move_type === 'jump' && move.to.row === piece.row && move.to.col === piece.col);
 
                 if (isVulnerable) {
-                    vulnerability_penalty += 100; // Increase penalty to significantly deter risky moves
+                    vulnerability_penalty += 200; // Further increased penalty
+                } else {
+                    protection_bonus += 50; // Reward for being in a tactically strong position
                 }
             }
         }
@@ -1384,38 +1345,19 @@ function utility(target_board) {
     let piece_difference = computer_pieces - human_pieces;
     let king_difference = computer_kings - human_kings;
 
-    if (human_pieces === 0) human_pieces = 0.00001;
-    let avg_human_pos = human_pos_sum / human_pieces;
-
-    if (computer_pieces === 0) computer_pieces = 0.00001;
-    let avg_computer_pos = computer_pos_sum / computer_pieces;
+    let avg_human_pos = human_pos_sum / Math.max(human_pieces, 0.00001);
+    let avg_computer_pos = computer_pos_sum / Math.max(computer_pieces, 0.00001);
     let avg_pos_diff = avg_computer_pos - avg_human_pos;
 
     for (let move of get_available_moves(computer, target_board)) {
-        if (move.move_type === 'jump') {
-            potential_captures += 1;
-        }
+        if (move.move_type === 'jump') potential_captures += 1;
     }
 
-    let features = [
-        piece_difference,
-        king_difference,
-        avg_pos_diff,
-        potential_captures
-    ];
+    let features = [piece_difference, king_difference, avg_pos_diff, potential_captures];
+    let weights = [100, 10, 5, 30];
 
-    let weights = [
-        100,
-        10,
-        5,
-        30
-    ];
-
-    let board_utility = 0;
-    for (let f = 0; f < features.length; f++) {
-        board_utility += features[f] * weights[f];
-    }
-
+    let board_utility = features.reduce((total, feature, index) => total + feature * weights[index], 0);
+    board_utility += protection_bonus; // Include protection bonus
     board_utility -= vulnerability_penalty;
 
     return board_utility;
