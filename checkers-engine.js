@@ -432,11 +432,23 @@ function getScore(boardState) {
 
 function getWinner(boardState) {
     var pieceCount = getPieceCount(boardState);
+    
+    // Check for no pieces left
     if (pieceCount.red > 0 && pieceCount.black === 0) {
         return red;
     } else if (pieceCount.black > 0 && pieceCount.red === 0) {
         return black;
-    } else return 0;
+    }
+    
+    // Check for no valid moves (draw)
+    let redMoves = get_available_moves(red, boardState);
+    let blackMoves = get_available_moves(black, boardState);
+    
+    if (redMoves.length === 0 && blackMoves.length === 0) {
+        return "draw";
+    }
+    
+    return 0;
 }
 
 /* SIDE EFFECT FUNCTIONS: UI and Board State */
@@ -548,12 +560,12 @@ function dragEnded(origin, width, node, d) {
 
         var delayCallback = function() {
             var winner = getWinner(currentBoard);
-            if (winner != 0) {
+            if (winner !== 0) {
                 currentBoard.gameOver = true;
+                updateScoreboard();
             } else {
                 computerMove();
             }
-            updateScoreboard();
             return true;
         };
 
@@ -755,24 +767,37 @@ function drawBoard(origin, cellWidth, boardCanvas) {
 function updateScoreboard() {
     var pieceCount = getPieceCount(currentBoard);
 
-    // Corrected labels for display
-    var redLabel = "Black: " + pieceCount.red; // Correctly label Red pieces
-    var blackLabel = "Red: " + pieceCount.black; // Correctly label Black pieces
+    // Update piece counts
+    var redLabel = "Black: " + pieceCount.red;
+    var blackLabel = "Red: " + pieceCount.black;
 
-    // Update scoreboard HTML
     d3.select("#redScore").html(redLabel);
     d3.select("#blackScore").html(blackLabel);
 
     var winner = getWinner(currentBoard);
     var winnerLabel = "";
+    
     if (winner === player) {
-        winnerLabel = "Black Wins!!"; // If 'player' is Red in this logic
+        winnerLabel = "Black Wins!!";
     } else if (winner === computer) {
-        winnerLabel = "Red Wins!!"; // If 'computer' is Black in this logic
+        winnerLabel = "Red Wins!!";
+    } else if (winner === "draw") {
+        winnerLabel = "Game Draw - No More Valid Moves!";
     }
 
     if (winner !== 0) {
         d3.select("#btnReplay").style("display", "inline");
+        
+        // Add visual feedback for draw
+        if (winner === "draw") {
+            d3.select("#winner")
+                .html(winnerLabel)
+                .style("color", "#FFD700"); // Gold color for draw
+        } else {
+            d3.select("#winner")
+                .html(winnerLabel)
+                .style("color", "#fff"); // Reset color for wins
+        }
     }
 
     d3.select("#winner").html(winnerLabel);
@@ -1128,7 +1153,12 @@ function computerMove() {
     var available_moves = get_available_moves(computer, simulated_board);
 
     if (available_moves.length === 0) {
-        console.warn('No available moves for the computer.');
+        // Check if it's a draw
+        let player_moves = get_available_moves(player, simulated_board);
+        if (player_moves.length === 0) {
+            currentBoard.gameOver = true;
+            updateScoreboard();
+        }
         return;
     }
 
@@ -1234,6 +1264,14 @@ function alpha_beta_search(calc_board, limit, moves) {
     let best_move;
     let max_score = NEG_INFINITY;
 
+    // Sort moves to improve pruning efficiency
+    moves.sort((a, b) => {
+        // Prioritize jumps and king moves
+        if (a.move_type === 'jump' && b.move_type !== 'jump') return -1;
+        if (b.move_type === 'jump' && a.move_type !== 'jump') return 1;
+        return Math.abs(a.piece.state) === 1.1 ? -1 : 1;
+    });
+
     for (let move of moves) {
         let simulated_board = copy_board(calc_board);
         let pieceIndex = getPieceIndex(simulated_board.pieces, move.from.row, move.from.col);
@@ -1247,9 +1285,31 @@ function alpha_beta_search(calc_board, limit, moves) {
             best_move = move;
         }
         alpha = Math.max(alpha, score);
+        if (alpha >= beta) break; // Beta cutoff
     }
 
     return best_move;
+}
+
+function evaluate_position(x, y, isKing) {
+    // Prioritize edges and back row for regular pieces
+    let positionScore = 0;
+    
+    // Edge control bonus
+    if (x === 0 || x === 7) positionScore += 3;
+    
+    // Back row protection bonus
+    if (y === 0 || y === 7) positionScore += 4;
+    
+    // Center control bonus (more important for kings)
+    if ((x === 3 || x === 4) && (y === 3 || y === 4)) {
+        positionScore += isKing ? 4 : 2;
+    }
+    
+    // Diagonal control bonus
+    if ((x + y) % 2 === 0) positionScore += 1;
+    
+    return positionScore;
 }
 
 function min_value(calc_board, human_moves, limit, alpha, beta) {
@@ -1314,51 +1374,89 @@ function utility(target_board) {
     let computer_pos_sum = 0;
     let human_pos_sum = 0;
     let potential_captures = 0;
-    let vulnerability_penalty = 0;
-    let protection_bonus = 0;
+    let mobility_score = 0;
 
+    // Calculate piece counts and positions
     for (var piece of target_board.pieces) {
         if (piece.row > -1) {
+            let isKing = Math.abs(piece.state) === 1.1;
             if (piece.state > 0) {
                 human_pieces += 1;
-                if (piece.state === redKing) human_kings += 1;
-                human_pos_sum += evaluate_position(piece.col, piece.row);
+                if (isKing) human_kings += 1;
+                human_pos_sum += evaluate_position(piece.col, piece.row, isKing);
             } else {
                 computer_pieces += 1;
-                if (piece.state === blackKing) computer_kings += 1;
-                computer_pos_sum += evaluate_position(piece.col, piece.row);
-
-                // Check vulnerability
-                let opponentMoves = get_available_moves(player, target_board);
-                let isVulnerable = opponentMoves.some(move =>
-                    move.move_type === 'jump' && move.to.row === piece.row && move.to.col === piece.col);
-
-                if (isVulnerable) {
-                    vulnerability_penalty += 200; // Further increased penalty
-                } else {
-                    protection_bonus += 50; // Reward for being in a tactically strong position
-                }
+                if (isKing) computer_kings += 1;
+                computer_pos_sum += evaluate_position(piece.col, piece.row, isKing);
             }
         }
     }
 
-    let piece_difference = computer_pieces - human_pieces;
-    let king_difference = computer_kings - human_kings;
+    // Calculate mobility (number of available moves)
+    let computer_moves = get_available_moves(computer, target_board).length;
+    let human_moves = get_available_moves(player, target_board).length;
+    mobility_score = computer_moves - human_moves;
 
-    let avg_human_pos = human_pos_sum / Math.max(human_pieces, 0.00001);
-    let avg_computer_pos = computer_pos_sum / Math.max(computer_pieces, 0.00001);
-    let avg_pos_diff = avg_computer_pos - avg_human_pos;
+    // Calculate feature weights
+    let piece_weight = 100;
+    let king_weight = 130;
+    let position_weight = 10;
+    let mobility_weight = 15;
+    let endgame = (computer_pieces + human_pieces) < 10;
 
-    for (let move of get_available_moves(computer, target_board)) {
-        if (move.move_type === 'jump') potential_captures += 1;
+    if (endgame) {
+        piece_weight *= 1.5;
+        king_weight *= 2;
+        mobility_weight *= 2;
     }
 
-    let features = [piece_difference, king_difference, avg_pos_diff, potential_captures];
-    let weights = [100, 10, 5, 30];
+    // Calculate final score
+    let score = 
+        piece_weight * (computer_pieces - human_pieces) +
+        king_weight * (computer_kings - human_kings) +
+        position_weight * (computer_pos_sum - human_pos_sum) +
+        mobility_weight * mobility_score;
 
-    let board_utility = features.reduce((total, feature, index) => total + feature * weights[index], 0);
-    board_utility += protection_bonus; // Include protection bonus
-    board_utility -= vulnerability_penalty;
+    return score;
+}
 
-    return board_utility;
+function analyzeMovePattern(move, board) {
+    let pattern_score = 0;
+    
+    // Check if move creates a protected piece
+    if (isProtectedPosition(move.to, board)) {
+        pattern_score += 50;
+    }
+    
+    // Check if move blocks opponent's king path
+    if (blocksKingPath(move, board)) {
+        pattern_score += 40;
+    }
+    
+    // Check if move creates a double-jump threat
+    if (createsDoubleJumpThreat(move, board)) {
+        pattern_score += 60;
+    }
+    
+    return pattern_score;
+}
+
+function isProtectedPosition(pos, board) {
+    return pos.row === 0 || pos.col === 0 || pos.col === 7 ||
+           hasAdjacentFriendlyPiece(pos, board);
+}
+
+function hasAdjacentFriendlyPiece(pos, board) {
+    let adjacent = [
+        {row: pos.row-1, col: pos.col-1},
+        {row: pos.row-1, col: pos.col+1},
+        {row: pos.row+1, col: pos.col-1},
+        {row: pos.row+1, col: pos.col+1}
+    ];
+    
+    return adjacent.some(adj => {
+        if (adj.row < 0 || adj.row > 7 || adj.col < 0 || adj.col > 7) return false;
+        let piece = board.pieces.find(p => p.row === adj.row && p.col === adj.col);
+        return piece && Math.sign(piece.state) === Math.sign(computer);
+    });
 }
