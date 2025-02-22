@@ -1148,6 +1148,7 @@ function isMoveSafe(simulatedBoard, move) {
     );
 }
 
+
 function computerMove() {
     var simulated_board = copy_board(currentBoard);
     var available_moves = get_available_moves(computer, simulated_board);
@@ -1162,17 +1163,32 @@ function computerMove() {
         return;
     }
 
-    // Prioritize jump moves or filter for safe moves otherwise
+    // Prioritize jump moves
     var jump_moves = available_moves.filter(move => move.move_type === 'jump');
     
     if (jump_moves.length > 0) {
+        // Always take jump moves if available
         move_to_execute = alpha_beta_search(simulated_board, 10, jump_moves) || select_random_move(jump_moves);
     } else {
-        available_moves = filterSafeMoves(available_moves, simulated_board);
-        move_to_execute = alpha_beta_search(simulated_board, 10, available_moves) || select_random_move(available_moves);
+        // Filter moves and evaluate them
+        let filtered_moves = filterSafeMoves(available_moves, simulated_board);
+        
+        // If we have no filtered moves (extremely rare), use any available move
+        if (filtered_moves.length === 0) {
+            filtered_moves = available_moves;
+        }
+        
+        move_to_execute = alpha_beta_search(simulated_board, 10, filtered_moves) || select_random_move(filtered_moves);
     }
 
-    executeMove(move_to_execute);
+    if (move_to_execute) {
+        executeMove(move_to_execute);
+    } else {
+        console.error('No valid moves available');
+        // Handle stalemate
+        currentBoard.gameOver = true;
+        updateScoreboard();
+    }
 }
 
 function executeMove(move) {
@@ -1203,6 +1219,7 @@ function executeMove(move) {
 }
 
 function filterSafeMoves(moves, board) {
+    // First, try to find completely safe moves
     let safeMoves = moves.filter(move => {
         let simulated_board = copy_board(board);
         let pieceIndex = getPieceIndex(simulated_board.pieces, move.from.row, move.from.col);
@@ -1217,22 +1234,58 @@ function filterSafeMoves(moves, board) {
         );
     });
 
-    // If no moves are marked safe, permit slightly risky moves to ensure a move is made
-    if (safeMoves.length === 0) {
-        safeMoves = moves.filter(move => {
-            let simulated_board = copy_board(board);
-            let pieceIndex = getPieceIndex(simulated_board.pieces, move.from.row, move.from.col);
-            let piece = simulated_board.pieces[pieceIndex];
-    
-            simulated_board = movePiece(simulated_board, piece, move.from, move.to, 1);
-            let opponentMoves = get_available_moves(player, simulated_board);
-
-            // Consider moves with minimal risk (i.e., no immediate loss but potential double jumps may exist)
-            return !opponentMoves.some(opMove => opMove.move_type === 'jump');
-        });
+    // If we found safe moves, return them
+    if (safeMoves.length > 0) {
+        return safeMoves;
     }
 
-    return safeMoves;
+    // If no safe moves, look for moves that minimize losses
+    let tradeoffMoves = moves.map(move => {
+        let simulated_board = copy_board(board);
+        let pieceIndex = getPieceIndex(simulated_board.pieces, move.from.row, move.from.col);
+        let piece = simulated_board.pieces[pieceIndex];
+
+        simulated_board = movePiece(simulated_board, piece, move.from, move.to, 1);
+        let opponentMoves = get_available_moves(player, simulated_board);
+
+        // Calculate potential losses
+        let lossCount = 0;
+        for (let opMove of opponentMoves) {
+            if (opMove.move_type === 'jump') {
+                // Simulate opponent's move to check for double jumps
+                let afterJumpBoard = copy_board(simulated_board);
+                let opPieceIndex = getPieceIndex(afterJumpBoard.pieces, opMove.from.row, opMove.from.col);
+                let opPiece = afterJumpBoard.pieces[opPieceIndex];
+                afterJumpBoard = movePiece(afterJumpBoard, opPiece, opMove.from, opMove.to, 1);
+                
+                let subsequentMoves = get_available_moves(player, afterJumpBoard);
+                if (subsequentMoves.some(m => m.move_type === 'jump')) {
+                    lossCount += 2; // Double jump is worse
+                } else {
+                    lossCount += 1; // Single jump
+                }
+            }
+        }
+
+        return {
+            move: move,
+            lossCount: lossCount
+        };
+    });
+
+    // Sort by loss count (ascending)
+    tradeoffMoves.sort((a, b) => a.lossCount - b.lossCount);
+
+    // If we have moves with minimal losses, return those
+    if (tradeoffMoves.length > 0) {
+        const minLoss = tradeoffMoves[0].lossCount;
+        return tradeoffMoves
+            .filter(m => m.lossCount === minLoss)
+            .map(m => m.move);
+    }
+
+    // If all else fails, return original moves
+    return moves;
 }
 
 function createsDoubleJump(board, move) {
