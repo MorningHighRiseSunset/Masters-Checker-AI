@@ -545,34 +545,35 @@ function dragEnded(origin, width, node, d) {
             .attr("cx", (d.x = cellCoordinates.x + width / 2))
             .attr("cy", (d.y = cellCoordinates.y + width / 2));
     } else {
-        // Rest of the existing dragEnded function...
-        currentBoard = movePiece(currentBoard, d, originalCell, cell, 1);
-
+        // First, snap the piece to its new position
         var cellCoordinates = mapCellToCoordinates(origin, width, cell);
         node
+            .transition()
+            .duration(200)  // Add a short transition duration
             .attr("cx", (d.x = cellCoordinates.x + width / 2))
-            .attr("cy", (d.y = cellCoordinates.y + width / 2));
+            .attr("cy", (d.y = cellCoordinates.y + width / 2))
+            .on("end", function() {  // After transition ends
+                // Then proceed with the move logic
+                currentBoard = movePiece(currentBoard, d, originalCell, cell, 1);
+                showBoardState();
+                currentBoard.turn = computer;
 
-        var score = getScore(currentBoard);
-        showBoardState();
-
-        currentBoard.turn = computer;
-
-        var delayCallback = function() {
-            var winner = getWinner(currentBoard);
-            if (winner !== 0) {
-                currentBoard.gameOver = true;
-                updateScoreboard();
-            } else {
-                computerMove();
-            }
-            return true;
-        };
-
-        var moveDelay = currentBoard.delay;
-        setTimeout(delayCallback, moveDelay);
+                var score = getScore(currentBoard);
+                
+                // Add a slight delay before AI's turn
+                setTimeout(function() {
+                    var winner = getWinner(currentBoard);
+                    if (winner !== 0) {
+                        currentBoard.gameOver = true;
+                        updateScoreboard();
+                    } else {
+                        computerMove();
+                    }
+                }, 300);  // 300ms delay after the snap animation
+            });
     }
 }
+
 /* END SIDE EFFECT FUNCTIONS */
 
 function getJumpedPiece(cells, pieces, from, to) {
