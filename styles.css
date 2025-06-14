@@ -229,3 +229,27 @@ button:hover {
     50% { transform: scale(1.05); }
     100% { transform: scale(1); }
 }
+
+/* --- THEME-MATCHING HIGHLIGHTS --- */
+.cell-highlight-move {
+    stroke: #444;
+    stroke-width: 4px;
+    fill: #444;
+    fill-opacity: 0.28;
+    pointer-events: none;
+}
+
+.cell-highlight-jump {
+    stroke: #b22222;
+    stroke-width: 4px;
+    fill: #b22222;
+    fill-opacity: 0.22;
+    pointer-events: none;
+}
+
+.selected-piece {
+    stroke: #00e6e6;
+    stroke-width: 4px;
+    filter: drop-shadow(0 0 10px #00e6e6);
+    fill-opacity: 1 !important;
+}
