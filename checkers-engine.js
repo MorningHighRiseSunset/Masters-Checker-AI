@@ -190,7 +190,7 @@ function drawBoard(origin, cellWidth, boardCanvas) {
 }
 
 function startGame(origin, cellWidth, boardCanvas) {
-    movePiece.moves = [];
+    movePiece.moves = []; // <-- Add this line
     d3.select("#btnReplay").style("display", "none");
     cell_width = cellWidth;
     board_origin = origin;
@@ -265,7 +265,7 @@ function get_available_moves(player, board) {
     return jumps.length ? jumps : moves;
 }
 
-function movePiece(board, piece, from, to, moveNum) {
+function movePiece(board, piece, from, to, moveNum, recordMove = true) {
     if (moveNum === undefined) moveNum = 1;
     var newBoard = copy_board(board);
     var fromIdx = getCellIndex(from.row, from.col), toIdx = getCellIndex(to.row, to.col);
@@ -288,7 +288,17 @@ function movePiece(board, piece, from, to, moveNum) {
         newBoard.pieces[jIdx].row = -1; newBoard.pieces[jIdx].col = -1; newBoard.pieces[jIdx].state = 0;
         // Multi-jump
         var moreJumps = get_available_piece_moves(newBoard, p, board.turn).filter(function(m) { return m.move_type === "jump"; });
-        if (moreJumps.length) return movePiece(newBoard, p, moreJumps[0].from, moreJumps[0].to, moveNum + 1);
+        if (moreJumps.length) {
+            if (recordMove) {
+                if (!movePiece.moves) movePiece.moves = [];
+                movePiece.moves.push({from: {...from}, to: {...to}, move_type: "jump"});
+            }
+            return movePiece(newBoard, p, moreJumps[0].from, moreJumps[0].to, moveNum + 1, recordMove);
+        }
+    }
+    if (recordMove) {
+        if (!movePiece.moves) movePiece.moves = [];
+        movePiece.moves.push({from: {...from}, to: {...to}, move_type: jumped ? "jump" : "slide"});
     }
     return newBoard;
 }
@@ -320,7 +330,7 @@ function min_value(board, depth, alpha, beta) {
     let minEval = INFINITY;
     for (let move of get_available_moves(player, board)) {
         let pIdx = getPieceIndex(board.pieces, move.from.row, move.from.col);
-        let newBoard = movePiece(copy_board(board), board.pieces[pIdx], move.from, move.to);
+        let newBoard = movePiece(copy_board(board), board.pieces[pIdx], move.from, move.to, 1, false); // recordMove=false
         newBoard.turn = computer;
         let eval = max_value(newBoard, depth - 1, alpha, beta);
         minEval = Math.min(minEval, eval);
@@ -335,7 +345,7 @@ function max_value(board, depth, alpha, beta) {
     let maxEval = NEG_INFINITY;
     for (let move of get_available_moves(computer, board)) {
         let pIdx = getPieceIndex(board.pieces, move.from.row, move.from.col);
-        let newBoard = movePiece(copy_board(board), board.pieces[pIdx], move.from, move.to);
+        let newBoard = movePiece(copy_board(board), board.pieces[pIdx], move.from, move.to, 1, false); // recordMove=false
         newBoard.turn = player;
         let eval = min_value(newBoard, depth - 1, alpha, beta);
         maxEval = Math.max(maxEval, eval);
@@ -351,9 +361,9 @@ function aiMove() {
     let bestMove = null, bestScore = NEG_INFINITY;
     for (let move of moves) {
         let pIdx = getPieceIndex(currentBoard.pieces, move.from.row, move.from.col);
-        let newBoard = movePiece(copy_board(currentBoard), currentBoard.pieces[pIdx], move.from, move.to);
+        let newBoard = movePiece(copy_board(currentBoard), currentBoard.pieces[pIdx], move.from, move.to, 1, false); // recordMove=false
         newBoard.turn = player;
-        let score = min_value(newBoard, 6, NEG_INFINITY, INFINITY); // Depth 6 for strong play
+        let score = min_value(newBoard, 6, NEG_INFINITY, INFINITY);
         if (score > bestScore) {
             bestScore = score;
             bestMove = move;
@@ -361,7 +371,7 @@ function aiMove() {
     }
     if (bestMove) {
         let pIdx = getPieceIndex(currentBoard.pieces, bestMove.from.row, bestMove.from.col);
-        currentBoard = movePiece(currentBoard, currentBoard.pieces[pIdx], bestMove.from, bestMove.to);
+        currentBoard = movePiece(currentBoard, currentBoard.pieces[pIdx], bestMove.from, bestMove.to, 1, true); // recordMove=true
         currentBoard.turn = player;
         showBoardState();
         updateScoreboard();
@@ -445,7 +455,42 @@ function updateScoreboard() {
     d3.select("#winner").html(label);
 }
 
+function printMoves() {
+    if (!movePiece.moves || movePiece.moves.length === 0) {
+        alert("No moves have been made yet!");
+        return;
+    }
+    let moveList = movePiece.moves.map((m, i) =>
+        `<li>${i + 1}. ${m.move_type.toUpperCase()} from (${m.from.row + 1},${m.from.col + 1}) to (${m.to.row + 1},${m.to.col + 1})</li>`
+    ).join('');
+    let printWindow = window.open('', '_blank');
+    printWindow.document.write(`
+        <html>
+        <head>
+            <title>Checkers Move List</title>
+            <style>
+                @media print {
+                    @page { size: auto; margin: 20mm; }
+                    html, body { width: auto !important; height: auto !important; }
+                }
+                body { font-family: Arial, sans-serif; padding: 20px; }
+                h2 { text-align: center; }
+                ul { font-size: 16px; }
+            </style>
+        </head>
+        <body>
+            <h2>Checkers Move List</h2>
+            <ul>${moveList}</ul>
+        </body>
+        </html>
+    `);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+}
+
 // --- Export for HTML ---
+window.printMoves = printMoves;
 window.startGame = startGame;
 window.showBoardState = showBoardState;
 window.updateScoreboard = updateScoreboard;
