@@ -355,7 +355,7 @@ function max_value(board, depth, alpha, beta) {
     return maxEval;
 }
 
-function aiMove() {
+async function aiMove() {
     let moves = get_available_moves(computer, currentBoard);
     if (!moves.length) return;
     let bestMove = null, bestScore = NEG_INFINITY;
@@ -370,8 +370,22 @@ function aiMove() {
         }
     }
     if (bestMove) {
+        // Get the full move sequence (for multi-jumps)
         let pIdx = getPieceIndex(currentBoard.pieces, bestMove.from.row, bestMove.from.col);
-        currentBoard = movePiece(currentBoard, currentBoard.pieces[pIdx], bestMove.from, bestMove.to, 1, true); // recordMove=true
+        movePiece.moves = [];
+        let tempBoard = movePiece(currentBoard, currentBoard.pieces[pIdx], bestMove.from, bestMove.to, 1, true);
+        let moveSeq = movePiece.moves.slice();
+
+        // Animate each step
+        for (let m of moveSeq) {
+            await animateMove(m.from, m.to, 900); // Slower, more fluid
+            // Now update board state for this step
+            let pieceIndex = getPieceIndex(currentBoard.pieces, m.from.row, m.from.col);
+            currentBoard = movePiece(currentBoard, currentBoard.pieces[pieceIndex], m.from, m.to, 1, true);
+            currentBoard.turn = computer; // Keep AI's turn until all jumps done
+            showBoardState();
+            await new Promise(res => setTimeout(res, 350)); // Slightly longer pause between jumps
+        }
         currentBoard.turn = player;
         showBoardState();
         updateScoreboard();
@@ -487,6 +501,42 @@ function printMoves() {
     printWindow.document.close();
     printWindow.focus();
     printWindow.print();
+}
+
+function animateMove(from, to, duration = 600) {
+    return new Promise(resolve => {
+        // Find the SVG circle for the piece at (from.row, from.col)
+        let pieceSelector = `circle[cx][cy]`;
+        let circles = d3.select("#checkersBoard").selectAll("circle").nodes();
+        let found = null;
+        for (let c of circles) {
+            let cx = +c.getAttribute("cx");
+            let cy = +c.getAttribute("cy");
+            let r = +c.getAttribute("r");
+            // Find the piece at the center of the from cell
+            let cellCoords = mapCellToCoordinates(board_origin, cell_width, from);
+            let expectedX = cellCoords.x + cell_width / 2;
+            let expectedY = cellCoords.y + cell_width / 2;
+            if (Math.abs(cx - expectedX) < 2 && Math.abs(cy - expectedY) < 2) {
+                found = c;
+                break;
+            }
+        }
+        if (!found) return resolve();
+
+        // Compute destination coordinates
+        let toCoords = mapCellToCoordinates(board_origin, cell_width, to);
+        let destX = toCoords.x + cell_width / 2;
+        let destY = toCoords.y + cell_width / 2;
+
+        // Animate using d3
+        d3.select(found)
+            .transition()
+            .duration(duration)
+            .attr("cx", destX)
+            .attr("cy", destY)
+            .on("end", resolve);
+    });
 }
 
 // --- Export for HTML ---
