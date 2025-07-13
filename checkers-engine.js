@@ -14,6 +14,8 @@ var INFINITY = 10000;
 var NEG_INFINITY = -10000;
 var cell_width = 0;
 var board_origin = 0;
+let forceJump = false; // Track if player must continue jumping
+let forceJumpPiece = null; // Track which piece must continue jumping
 
 function initializeBoard() {
     var initialBoard = [
@@ -190,13 +192,15 @@ function drawBoard(origin, cellWidth, boardCanvas) {
 }
 
 function startGame(origin, cellWidth, boardCanvas) {
-    movePiece.moves = []; // <-- Add this line
+    movePiece.moves = [];
     d3.select("#btnReplay").style("display", "none");
     cell_width = cellWidth;
     board_origin = origin;
-    currentBoard = initializeBoard(); // Only here!
+    currentBoard = initializeBoard();
     currentBoard.ui = true;
     selectedPiece = null;
+    forceJump = false;
+    forceJumpPiece = null;
     showBoardState();
 }
 
@@ -206,7 +210,8 @@ function getJumpedPiece(cells, pieces, from, to) {
     if (abs(to.col - from.col) === 2) {
         var jumpRow = from.row + sign(to.row - from.row);
         var jumpCol = from.col + sign(to.col - from.col);
-        return pieces[getPieceIndex(pieces, jumpRow, jumpCol)];
+        let idx = getPieceIndex(pieces, jumpRow, jumpCol);
+        if (idx !== -1) return pieces[idx];
     }
     return null;
 }
@@ -270,6 +275,7 @@ function movePiece(board, piece, from, to, moveNum, recordMove = true) {
     var newBoard = copy_board(board);
     var fromIdx = getCellIndex(from.row, from.col), toIdx = getCellIndex(to.row, to.col);
     var pIdx = getPieceIndex(newBoard.pieces, from.row, from.col);
+    if (pIdx === -1) return newBoard;
     var p = newBoard.pieces[pIdx];
     // Move piece
     newBoard.cells[fromIdx].state = empty;
@@ -284,8 +290,10 @@ function movePiece(board, piece, from, to, moveNum, recordMove = true) {
     var jumped = getJumpedPiece(newBoard.cells, newBoard.pieces, from, to);
     if (jumped) {
         var jIdx = getPieceIndex(newBoard.pieces, jumped.row, jumped.col);
-        newBoard.cells[getCellIndex(jumped.row, jumped.col)].state = empty;
-        newBoard.pieces[jIdx].row = -1; newBoard.pieces[jIdx].col = -1; newBoard.pieces[jIdx].state = 0;
+        if (jIdx !== -1) {
+            newBoard.cells[getCellIndex(jumped.row, jumped.col)].state = empty;
+            newBoard.pieces[jIdx].row = -1; newBoard.pieces[jIdx].col = -1; newBoard.pieces[jIdx].state = 0;
+        }
         // Multi-jump
         var moreJumps = get_available_piece_moves(newBoard, p, board.turn).filter(function(m) { return m.move_type === "jump"; });
         if (moreJumps.length) {
@@ -330,7 +338,8 @@ function min_value(board, depth, alpha, beta) {
     let minEval = INFINITY;
     for (let move of get_available_moves(player, board)) {
         let pIdx = getPieceIndex(board.pieces, move.from.row, move.from.col);
-        let newBoard = movePiece(copy_board(board), board.pieces[pIdx], move.from, move.to, 1, false); // recordMove=false
+        if (pIdx === -1) continue;
+        let newBoard = movePiece(copy_board(board), board.pieces[pIdx], move.from, move.to, 1, false);
         newBoard.turn = computer;
         let eval = max_value(newBoard, depth - 1, alpha, beta);
         minEval = Math.min(minEval, eval);
@@ -345,7 +354,8 @@ function max_value(board, depth, alpha, beta) {
     let maxEval = NEG_INFINITY;
     for (let move of get_available_moves(computer, board)) {
         let pIdx = getPieceIndex(board.pieces, move.from.row, move.from.col);
-        let newBoard = movePiece(copy_board(board), board.pieces[pIdx], move.from, move.to, 1, false); // recordMove=false
+        if (pIdx === -1) continue;
+        let newBoard = movePiece(copy_board(board), board.pieces[pIdx], move.from, move.to, 1, false);
         newBoard.turn = player;
         let eval = min_value(newBoard, depth - 1, alpha, beta);
         maxEval = Math.max(maxEval, eval);
@@ -361,7 +371,8 @@ async function aiMove() {
     let bestMove = null, bestScore = NEG_INFINITY;
     for (let move of moves) {
         let pIdx = getPieceIndex(currentBoard.pieces, move.from.row, move.from.col);
-        let newBoard = movePiece(copy_board(currentBoard), currentBoard.pieces[pIdx], move.from, move.to, 1, false); // recordMove=false
+        if (pIdx === -1) continue;
+        let newBoard = movePiece(copy_board(currentBoard), currentBoard.pieces[pIdx], move.from, move.to, 1, false);
         newBoard.turn = player;
         let score = min_value(newBoard, 6, NEG_INFINITY, INFINITY);
         if (score > bestScore) {
@@ -370,25 +381,25 @@ async function aiMove() {
         }
     }
     if (bestMove) {
-        // Get the full move sequence (for multi-jumps)
         let pIdx = getPieceIndex(currentBoard.pieces, bestMove.from.row, bestMove.from.col);
         movePiece.moves = [];
         let tempBoard = movePiece(currentBoard, currentBoard.pieces[pIdx], bestMove.from, bestMove.to, 1, true);
         let moveSeq = movePiece.moves.slice();
 
-        // Animate each step
         for (let m of moveSeq) {
-            await animateMove(m.from, m.to, 900); // Slower, more fluid
-            // Now update board state for this step
+            await animateMove(m.from, m.to, 900);
             let pieceIndex = getPieceIndex(currentBoard.pieces, m.from.row, m.from.col);
+            if (pieceIndex === -1) continue;
             currentBoard = movePiece(currentBoard, currentBoard.pieces[pieceIndex], m.from, m.to, 1, true);
-            currentBoard.turn = computer; // Keep AI's turn until all jumps done
+            currentBoard.turn = computer;
             showBoardState();
-            await new Promise(res => setTimeout(res, 350)); // Slightly longer pause between jumps
+            await new Promise(res => setTimeout(res, 350));
         }
         currentBoard.turn = player;
         showBoardState();
         updateScoreboard();
+        forceJump = false;
+        forceJumpPiece = null;
     }
 }
 
@@ -418,6 +429,10 @@ function highlightMoves(moves) {
 
 function mobilePieceTapHandler(d) {
     if (currentBoard.turn !== player || currentBoard.gameOver) return;
+    // If forced jump, only allow selecting the forced piece
+    if (forceJump && (!forceJumpPiece || d.row !== forceJumpPiece.row || d.col !== forceJumpPiece.col)) {
+        return;
+    }
     if (selectedPiece && selectedPiece.row === d.row && selectedPiece.col === d.col) {
         selectedPiece = null;
         clearHighlights();
@@ -425,7 +440,7 @@ function mobilePieceTapHandler(d) {
         return;
     }
     selectedPiece = d;
-    showBoardState(); // This will redraw and highlight moves for the selected piece
+    showBoardState();
 }
 
 function mobileCellTapHandler(cell) {
@@ -434,10 +449,28 @@ function mobileCellTapHandler(cell) {
     let move = moves.find(m => m.to.row === cell.row && m.to.col === cell.col);
     if (move) {
         let pieceIndex = getPieceIndex(currentBoard.pieces, selectedPiece.row, selectedPiece.col);
+        if (pieceIndex === -1) return;
         currentBoard = movePiece(currentBoard, currentBoard.pieces[pieceIndex], move.from, move.to);
-        selectedPiece = null; clearHighlights();
+        // After move, check if another jump is available for this piece
+        let movedPiece = currentBoard.pieces[getPieceIndex(currentBoard.pieces, move.to.row, move.to.col)];
+        let moreJumps = get_available_piece_moves(currentBoard, movedPiece, player).filter(m => m.move_type === "jump");
+        if (move.move_type === "jump" && moreJumps.length) {
+            // Force player to continue jumping with this piece
+            forceJump = true;
+            forceJumpPiece = movedPiece;
+            selectedPiece = movedPiece;
+            showBoardState();
+            updateScoreboard();
+            return;
+        }
+        // Otherwise, end turn
+        selectedPiece = null;
+        clearHighlights();
         currentBoard.turn = computer;
-        showBoardState(); updateScoreboard();
+        showBoardState();
+        updateScoreboard();
+        forceJump = false;
+        forceJumpPiece = null;
         setTimeout(() => { aiMove(); }, 400);
     }
 }
@@ -448,6 +481,10 @@ function showBoardState() {
     drawBoard(board_origin, cell_width, boardCanvas);
     if (selectedPiece) {
         let moves = get_available_piece_moves(currentBoard, selectedPiece, player);
+        // If forced jump, only show jump moves
+        if (forceJump) {
+            moves = moves.filter(m => m.move_type === "jump");
+        }
         highlightMoves(moves);
     }
 }
@@ -455,16 +492,16 @@ function showBoardState() {
 function updateScoreboard() {
     let redCount = currentBoard.pieces.filter(p => (p.state === red || p.state === redKing) && p.row >= 0).length;
     let blackCount = currentBoard.pieces.filter(p => (p.state === black || p.state === blackKing) && p.row >= 0).length;
-    d3.select("#redScore").html("Black: " + redCount);
-    d3.select("#blackScore").html("Red: " + blackCount);
+    d3.select("#redScore").html("Red: " + redCount);
+    d3.select("#blackScore").html("Black: " + blackCount);
     // Winner
     let winner = 0;
     if (redCount === 0) winner = computer;
     else if (blackCount === 0) winner = player;
     else if (!get_available_moves(player, currentBoard).length && !get_available_moves(computer, currentBoard).length) winner = "draw";
     let label = "";
-    if (winner === player) label = "Black Wins!!";
-    else if (winner === computer) label = "Red Wins!!";
+    if (winner === player) label = "Red Wins!!";
+    else if (winner === computer) label = "Black Wins!!";
     else if (winner === "draw") label = "Game Draw - No More Valid Moves!";
     d3.select("#winner").html(label);
 }
@@ -477,7 +514,7 @@ function printMoves() {
     let moveList = movePiece.moves.map((m, i) =>
         `<li>${i + 1}. ${m.move_type.toUpperCase()} from (${m.from.row + 1},${m.from.col + 1}) to (${m.to.row + 1},${m.to.col + 1})</li>`
     ).join('');
-    let printWindow = window.open('', '_blank');
+    let printWindow = window.open('', '_blank', 'noopener');
     printWindow.document.write(`
         <html>
         <head>
@@ -505,15 +542,12 @@ function printMoves() {
 
 function animateMove(from, to, duration = 600) {
     return new Promise(resolve => {
-        // Find the SVG circle for the piece at (from.row, from.col)
-        let pieceSelector = `circle[cx][cy]`;
         let circles = d3.select("#checkersBoard").selectAll("circle").nodes();
         let found = null;
         for (let c of circles) {
             let cx = +c.getAttribute("cx");
             let cy = +c.getAttribute("cy");
             let r = +c.getAttribute("r");
-            // Find the piece at the center of the from cell
             let cellCoords = mapCellToCoordinates(board_origin, cell_width, from);
             let expectedX = cellCoords.x + cell_width / 2;
             let expectedY = cellCoords.y + cell_width / 2;
@@ -524,12 +558,10 @@ function animateMove(from, to, duration = 600) {
         }
         if (!found) return resolve();
 
-        // Compute destination coordinates
         let toCoords = mapCellToCoordinates(board_origin, cell_width, to);
         let destX = toCoords.x + cell_width / 2;
         let destY = toCoords.y + cell_width / 2;
 
-        // Animate using d3
         d3.select(found)
             .transition()
             .duration(duration)
